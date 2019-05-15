@@ -25,14 +25,15 @@ inline double log1exp(const double& x)
 }
 
 // log(1 + exp(x1)) + ... + log(1 + exp(xn))
-inline double sum_log1exp(const double* x, int n)
+template <typename Derived>
+void apply_log1exp(Eigen::MatrixBase<Derived>& x)
 {
-    double res = 0.0;
+    const int n = x.size();
+    double* xptr = x.derived().data();
     for(int i = 0; i < n; i++)
     {
-        res += log1exp(x[i]);
+        xptr[i] = log1exp(xptr[i]);
     }
-    return res;
 }
 
 // res ~ Bernoulli(prob)

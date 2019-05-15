@@ -29,7 +29,6 @@ inline MatrixXd permutation(const int n)
 double loglik_rbm(MapMat w, MapVec b, MapVec c, MapMat v)
 {
     const int m = w.rows();
-    const int pm = (1 << m);  // 2^m
     const int n = w.cols();
     const int N = v.cols();
 
@@ -43,10 +42,8 @@ double loglik_rbm(MapMat w, MapVec b, MapVec c, MapMat v)
     VectorXd logzv = vperm.transpose() * b;
     MatrixXd vpermwc = w.transpose() * vperm;
     vpermwc.colwise() += c;
-    for(int i = 0; i < pm; i++)
-    {
-        logzv[i] += sum_log1exp(&vpermwc(0, i), n);
-    }
+    apply_log1exp(vpermwc);
+    logzv.noalias() += vpermwc.colwise().sum().transpose();
     const double logz = log_sum_exp(logzv);
 
     // https://arxiv.org/pdf/1510.02255.pdf, Eqn. (4)
@@ -54,10 +51,8 @@ double loglik_rbm(MapMat w, MapVec b, MapVec c, MapMat v)
     VectorXd term1 = v.transpose() * b;
     MatrixXd term2 = w.transpose() * v;
     term2.colwise() += c;
-    for(int i = 0; i < N; i++)
-    {
-        loglik[i] = term1[i] + sum_log1exp(&term2(0, i), n) - logz;
-    }
+    apply_log1exp(term2);
+    loglik.noalias() = term1 + term2.colwise().sum().transpose();
 
-    return loglik.sum();
+    return loglik.sum() - logz * N;
 }
