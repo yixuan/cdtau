@@ -1,4 +1,5 @@
 #include <RcppEigen.h>
+#include "utils.h"
 
 using Rcpp::NumericVector;
 using Rcpp::NumericMatrix;
@@ -7,16 +8,17 @@ using Eigen::MatrixXd;
 typedef Eigen::Map<VectorXd> MapVec;
 typedef Eigen::Map<MatrixXd> MapMat;
 
+// res[n x 2^n]
 inline MatrixXd permutation(const int n)
 {
     const int pn = (1 << n);  // 2^n
-    MatrixXd res(pn, n);
+    MatrixXd res(n, pn);
     double* r = res.data();
-    for(int j = 0; j < n; j++)
+    for(int j = 0; j < pn; j++)
     {
-        for(int i = 0; i < pn; i++, r++)
+        for(int i = 0; i < n; i++, r++)
         {
-            *r = (i >> j) & 1;
+            *r = (j >> i) & 1;
         }
     }
     return res;
@@ -27,47 +29,35 @@ inline MatrixXd permutation(const int n)
 double loglik_rbm(MapMat w, MapVec b, MapVec c, MapMat v)
 {
     const int m = w.rows();
-    const int n = w.cols();
     const int pm = (1 << m);  // 2^m
-    const int pn = (1 << n);  // 2^n
+    const int n = w.cols();
     const int N = v.cols();
 
     // Check dimension
     if(b.size() != m || c.size() != n || v.rows() != m)
         Rcpp::stop("Dimensions do not match");
 
+    // log(Z)
+    // https://arxiv.org/pdf/1510.02255.pdf, Eqn. (5)
     MatrixXd vperm = permutation(m);
-    MatrixXd hperm = permutation(n);
-    VectorXd vbperm = vperm * b;
-    VectorXd hcperm = hperm * c;
-    MatrixXd joint_prob(pm, pn);
-    // -E = b'v + c'h + v'wh
-    joint_prob.noalias() = vperm * w * hperm.transpose();
-    joint_prob.colwise() += vbperm;
-    joint_prob.rowwise() += hcperm.transpose();
-    // p = exp(-E)
-    joint_prob.array() = joint_prob.array().exp();
-    // Reuse memory
-    VectorXd& vdist = vbperm;
-    vdist.noalias() = joint_prob.rowwise().sum();
-    const double z = vdist.sum();
-    vdist /= z;
-    // Free memory
-    vperm.resize(1, 1);
-    hperm.resize(1, 1);
-    joint_prob.resize(1, 1);
-    hcperm.resize(1);
-
-    NumericVector loglik(N);
-    for(int j = 0; j < N; j++)
+    VectorXd logzv = vperm.transpose() * b;
+    MatrixXd vpermwc = w.transpose() * vperm;
+    vpermwc.colwise() += c;
+    for(int i = 0; i < pm; i++)
     {
-        int ind = 0;
-        for(int i = 0; i < m; i++)
-        {
-            ind += int(v.coeff(i, j) > 0.5) << i;
-        }
-        loglik[j] = std::log(vdist[ind]);
+        logzv[i] += sum_log1exp(&vpermwc(0, i), n);
+    }
+    const double logz = log_sum_exp(logzv);
+
+    // https://arxiv.org/pdf/1510.02255.pdf, Eqn. (4)
+    VectorXd loglik(N);
+    VectorXd term1 = v.transpose() * b;
+    MatrixXd term2 = w.transpose() * v;
+    term2.colwise() += c;
+    for(int i = 0; i < N; i++)
+    {
+        loglik[i] = term1[i] + sum_log1exp(&term2(0, i), n) - logz;
     }
 
-    return Rcpp::sum(loglik);
+    return loglik.sum();
 }

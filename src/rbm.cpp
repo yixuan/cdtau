@@ -46,7 +46,7 @@ inline double loglik_approx(
 List rbm_cdk(
     int vis_dim, int hid_dim, MapMat dat,
     int batch_size = 10, double lr = 0.1, int niter = 100, int ngibbs = 10,
-    bool eval_loglik = false, bool exact_loglik = false, int verbose = 0
+    bool eval_loglik = false, bool exact_loglik = true, int verbose = 0
 )
 {
     const int m = vis_dim;
@@ -139,7 +139,7 @@ List rbm_fit(
     int vis_dim, int hid_dim, MapMat dat,
     int batch_size = 10, double lr = 0.1, int niter = 100,
     int min_mcmc = 1, int max_mcmc = 100,
-    bool eval_loglik = false, bool exact_loglik = false, int verbose = 0
+    bool eval_loglik = false, bool exact_loglik = true, int verbose = 0
 )
 {
     const int m = vis_dim;

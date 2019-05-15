@@ -17,6 +17,24 @@ inline double log_sum_exp(const Eigen::VectorXd& x)
     return xmax + std::log((x.array() - xmax).exp().sum());
 }
 
+// log(1 + exp(x))
+// https://stackoverflow.com/a/51828104
+inline double log1exp(const double& x)
+{
+    return std::log(1.0 + std::exp(-std::abs(x))) + std::max(x, 0.0);
+}
+
+// log(1 + exp(x1)) + ... + log(1 + exp(xn))
+inline double sum_log1exp(const double* x, int n)
+{
+    double res = 0.0;
+    for(int i = 0; i < n; i++)
+    {
+        res += log1exp(x[i]);
+    }
+    return res;
+}
+
 // res ~ Bernoulli(prob)
 inline void random_bernoulli(const Eigen::VectorXd& prob, Eigen::VectorXd& res)
 {
