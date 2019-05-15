@@ -45,7 +45,8 @@ inline double loglik_approx(
 // [[Rcpp::export]]
 List rbm_cdk(
     int vis_dim, int hid_dim, MapMat dat,
-    int batch_size = 10, double lr = 0.1, int niter = 100, int ngibbs = 10,
+    int batch_size = 10, double lr = 0.1, int niter = 100,
+    int ngibbs = 10, int nchain = 1,
     bool eval_loglik = false, bool exact_loglik = true, int verbose = 0
 )
 {
@@ -69,7 +70,8 @@ List rbm_cdk(
     // log-likelihood value in each iteration
     NumericVector loglik(niter);
 
-    VectorXd v0(m), v(m), h(n), h0mean(n), hmean(n);
+    VectorXd v0(m), v(m), h(n), h0mean(n);
+    MatrixXd vchains(m, nchain), hmeanchains(n, nchain);
     for(int k = 0; k < niter; k++)
     {
         if(verbose > 0)
@@ -99,18 +101,25 @@ List rbm_cdk(
                 h0mean.noalias() = w.transpose() * v0 + c;
                 apply_sigmoid(h0mean);
 
-                sampler.sample_k(v0, v, h, ngibbs);
-                hmean.noalias() = w.transpose() * v + c;
-                apply_sigmoid(hmean);
+                for(int l = 0; l < nchain; l++)
+                {
+                    sampler.sample_k(v0, v, h, ngibbs);
+                    vchains.col(l).noalias() = v;
+                }
 
-                db.noalias() += (v0 - v);
-                dc.noalias() += (h0mean - hmean);
-                dw.noalias() += (v0 * h0mean.transpose() - v * hmean.transpose());
+                hmeanchains.noalias() = w.transpose() * vchains;
+                hmeanchains.colwise() += c;
+                apply_sigmoid(hmeanchains);
+
+                db.noalias() += (v0 - vchains.rowwise().mean());
+                dc.noalias() += (h0mean - hmeanchains.rowwise().mean());
+                dw.noalias() += (v0 * h0mean.transpose() -
+                    (1.0 / nchain) * vchains * hmeanchains.transpose());
             }
 
-            b.noalias() += (lr / bs) * db;
-            c.noalias() += (lr / bs) * dc;
-            w.noalias() += (lr / bs) * dw;
+            b.noalias() += lr / double(bs) * db;
+            c.noalias() += lr / double(bs) * dc;
+            w.noalias() += lr / double(bs) * dw;
         }
 
         if(exact_loglik)
@@ -138,7 +147,7 @@ List rbm_cdk(
 List rbm_fit(
     int vis_dim, int hid_dim, MapMat dat,
     int batch_size = 10, double lr = 0.1, int niter = 100,
-    int min_mcmc = 1, int max_mcmc = 100,
+    int min_mcmc = 1, int max_mcmc = 100, int nchain = 1,
     bool eval_loglik = false, bool exact_loglik = true, int verbose = 0
 )
 {
@@ -193,35 +202,43 @@ List rbm_fit(
                 h0_mean.noalias() = w.transpose() * v0 + c;
                 apply_sigmoid(h0_mean);
 
-                sampler.sample(v0, vhist, vchist, min_mcmc, max_mcmc);
-                const int burnin = min_mcmc - 1;
-                const int remain = vchist.cols() - burnin;
+                for(int l = 0; l < nchain; l++)
+                {
+                    sampler.sample(v0, vhist, vchist, min_mcmc, max_mcmc);
+                    const int burnin = min_mcmc - 1;
+                    const int remain = vchist.cols() - burnin;
 
-                v1.noalias() = vhist.col(burnin);
-                h1_mean.noalias() = w.transpose() * v1 + c;
-                apply_sigmoid(h1_mean);
+                    v1.noalias() = vhist.col(burnin);
+                    h1_mean.noalias() = w.transpose() * v1 + c;
+                    apply_sigmoid(h1_mean);
 
-                MatrixXd hhist_mean = w.transpose() * vhist.rightCols(remain);
-                hhist_mean.colwise() += c;
-                apply_sigmoid(hhist_mean);
+                    MatrixXd hhist_mean = w.transpose() * vhist.rightCols(remain);
+                    hhist_mean.colwise() += c;
+                    apply_sigmoid(hhist_mean);
 
-                MatrixXd hchist_mean = w.transpose() * vchist.rightCols(remain);
-                hchist_mean.colwise() += c;
-                apply_sigmoid(hchist_mean);
+                    MatrixXd hchist_mean = w.transpose() * vchist.rightCols(remain);
+                    hchist_mean.colwise() += c;
+                    apply_sigmoid(hchist_mean);
 
-                db.noalias() += (v0 - v1 - vhist.rightCols(remain).rowwise().sum() +
-                                           vchist.rightCols(remain).rowwise().sum());
-                dc.noalias() += (h0_mean - h1_mean - hhist_mean.rowwise().sum() +
-                                                     hchist_mean.rowwise().sum());
-                dw.noalias() += (v0 * h0_mean.transpose() -
-                                 v1 * h1_mean.transpose() -
-                                 vhist.rightCols(remain) * hhist_mean.transpose() +
-                                 vchist.rightCols(remain) * hchist_mean.transpose());
+                    db.noalias() += (-v1 -
+                        vhist.rightCols(remain).rowwise().sum() +
+                        vchist.rightCols(remain).rowwise().sum());
+                    dc.noalias() += (-h1_mean -
+                        hhist_mean.rowwise().sum() +
+                        hchist_mean.rowwise().sum());
+                    dw.noalias() += (-v1 * h1_mean.transpose() -
+                        vhist.rightCols(remain) * hhist_mean.transpose() +
+                        vchist.rightCols(remain) * hchist_mean.transpose());
+                }
+
+                db.noalias() += double(nchain) * v0;
+                dc.noalias() += double(nchain) * h0_mean;
+                dw.noalias() += double(nchain) * v0 * h0_mean.transpose();
             }
 
-            b.noalias() += (lr / bs) * db;
-            c.noalias() += (lr / bs) * dc;
-            w.noalias() += (lr / bs) * dw;
+            b.noalias() += lr / double(bs * nchain) * db;
+            c.noalias() += lr / double(bs * nchain) * dc;
+            w.noalias() += lr / double(bs * nchain) * dw;
         }
 
         if(exact_loglik)
