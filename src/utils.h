@@ -2,6 +2,7 @@
 #define CDTAU_UTILS_H
 
 #include <RcppEigen.h>
+#include <xsimd/xsimd.hpp>
 
 // x => sigmoid(x)
 template <typename Derived>
@@ -26,13 +27,43 @@ inline double log1exp(const double& x)
 
 // log(1 + exp(x1)) + ... + log(1 + exp(xn))
 template <typename Derived>
-void apply_log1exp(Eigen::MatrixBase<Derived>& x)
+void apply_log1exp_std(Eigen::MatrixBase<Derived>& x)
 {
     const int n = x.size();
     double* xptr = x.derived().data();
     for(int i = 0; i < n; i++)
     {
         xptr[i] = log1exp(xptr[i]);
+    }
+}
+
+template <typename Derived>
+void apply_log1exp(Eigen::MatrixBase<Derived>& x)
+{
+    /* Eigen::ArrayXXd max0 = x.array().max(0.0);
+    x.array() = 1.0 + (-x.array().abs()).exp();
+    x.array() = x.array().log();
+    x.array() += max0; */
+
+    typedef xsimd::batch<double, xsimd::simd_type<double>::size> vec;
+
+    double* xp = x.derived().data();
+    const int n = x.size();
+    const int simd_size = xsimd::simd_type<double>::size;
+    const int vec_size = n - n % simd_size;
+
+    vec zero;
+    zero ^= zero;
+
+    for(int i = 0; i < vec_size; i += simd_size)
+    {
+        vec xi = xsimd::load_aligned(xp + i);
+        xi = xsimd::log(1.0 + xsimd::exp(-xsimd::abs(xi))) + xsimd::max(zero, xi);
+        xi.store_aligned(xp + i);
+    }
+    for(int i = vec_size; i < n; i++)
+    {
+        xp[i] = log1exp(xp[i]);
     }
 }
 
