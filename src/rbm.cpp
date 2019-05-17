@@ -10,36 +10,10 @@ using Eigen::MatrixXd;
 typedef Eigen::Map<VectorXd> MapVec;
 typedef Eigen::Map<MatrixXd> MapMat;
 
-double loglik_rbm(MapMat w, MapVec b, MapVec c, MapMat v);
+double loglik_rbm(MapMat w, MapVec b, MapVec c, MapMat dat);
 
-inline double loglik_approx(
-    const MatrixXd& w, const VectorXd& b, const VectorXd& c, const MatrixXd& dat,
-    int nsamp = 100, int nstep = 100
-)
-{
-    const int m = w.rows();
-    const int n = w.cols();
-    const int N = dat.cols();
-
-    RBMSampler sampler(w, b, c);
-    VectorXd v0(m), v(m), vmean(m), h(n), logp(nsamp);
-    double loglik = 0.0;
-
-    for(int i = 0; i < N; i++)
-    {
-        for(int j = 0; j < nsamp; j++)
-        {
-            v0.noalias() = dat.col(random_int(N));
-            sampler.sample_k(v0, v, h, nstep);
-            vmean.noalias() = w * h + b;
-            apply_sigmoid(vmean);
-            logp[j] = loglik_bernoulli(vmean.data(), &dat(0, i), m);
-        }
-        loglik += log_sum_exp(logp);
-    }
-
-    return loglik - N * std::log(double(nsamp));
-}
+double loglik_rbm_approx(MapMat w, MapVec b, MapVec c, MapMat dat,
+                         int nsamp = 100, int nstep = 100);
 
 // dat [m x N]
 // [[Rcpp::export]]
@@ -122,15 +96,17 @@ List rbm_cdk(
             w.noalias() += lr / double(bs) * dw;
         }
 
+        // Compute loglikelihood values if requested
+        MapMat mw(w.data(), m, n);
+        MapVec mb(b.data(), m);
+        MapVec mc(c.data(), n);
+        MapMat mdat(dat.data(), m, N);
+
         if(exact_loglik)
         {
-            MapMat mw(w.data(), m, n);
-            MapVec mb(b.data(), m);
-            MapVec mc(c.data(), n);
-            MapMat mdat(dat.data(), m, N);
             loglik[k] = eval_loglik ? (loglik_rbm(mw, mb, mc, mdat)) : (NumericVector::get_na());
         } else {
-            loglik[k] = eval_loglik ? (loglik_approx(w, b, c, dat, 100, 10)) : (NumericVector::get_na());
+            loglik[k] = eval_loglik ? (loglik_rbm_approx(mw, mb, mc, mdat, 100, 10)) : (NumericVector::get_na());
         }
     }
 
@@ -148,7 +124,7 @@ List rbm_fit(
     int vis_dim, int hid_dim, MapMat dat,
     int batch_size = 10, double lr = 0.1, int niter = 100,
     int min_mcmc = 1, int max_mcmc = 100, int nchain = 1,
-    bool eval_loglik = false, bool exact_loglik = true, int verbose = 0
+    bool eval_loglik = false, bool exact_loglik = false, int verbose = 0
 )
 {
     const int m = vis_dim;
@@ -245,15 +221,17 @@ List rbm_fit(
             w.noalias() += lr / double(bs * nchain) * dw;
         }
 
+        // Compute loglikelihood values if requested
+        MapMat mw(w.data(), m, n);
+        MapVec mb(b.data(), m);
+        MapVec mc(c.data(), n);
+        MapMat mdat(dat.data(), m, N);
+
         if(exact_loglik)
         {
-            MapMat mw(w.data(), m, n);
-            MapVec mb(b.data(), m);
-            MapVec mc(c.data(), n);
-            MapMat mdat(dat.data(), m, N);
             loglik[k] = eval_loglik ? (loglik_rbm(mw, mb, mc, mdat)) : (NumericVector::get_na());
         } else {
-            loglik[k] = eval_loglik ? (loglik_approx(w, b, c, dat, 100, 10)) : (NumericVector::get_na());
+            loglik[k] = eval_loglik ? (loglik_rbm_approx(mw, mb, mc, mdat, 100, 10)) : (NumericVector::get_na());
         }
 
         tau[k] /= (N * nchain);
