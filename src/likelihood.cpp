@@ -1,6 +1,7 @@
 #include <RcppEigen.h>
 #include "mcmc.h"
 #include "utils.h"
+#include "utils_simd.h"
 
 using Rcpp::NumericVector;
 using Rcpp::NumericMatrix;
@@ -43,7 +44,7 @@ double loglik_rbm(MapMat w, MapVec b, MapVec c, MapMat dat)
     VectorXd logzv = vperm.transpose() * b;
     MatrixXd vpermwc = w.transpose() * vperm;
     vpermwc.colwise() += c;
-    apply_log1exp(vpermwc);
+    apply_log1exp_simd(vpermwc);
     logzv.noalias() += vpermwc.colwise().sum().transpose();
     const double logz = log_sum_exp(logzv);
 
@@ -52,7 +53,7 @@ double loglik_rbm(MapMat w, MapVec b, MapVec c, MapMat dat)
     VectorXd term1 = dat.transpose() * b;
     MatrixXd term2 = w.transpose() * dat;
     term2.colwise() += c;
-    apply_log1exp(term2);
+    apply_log1exp_simd(term2);
     loglik.noalias() = term1 + term2.colwise().sum().transpose();
 
     return loglik.sum() - logz * N;
