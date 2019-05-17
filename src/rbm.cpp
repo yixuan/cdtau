@@ -171,6 +171,9 @@ List rbm_fit(
     // log-likelihood value in each iteration
     NumericVector loglik(niter);
 
+    // Average length of Markov chains in each iteration
+    NumericVector tau(niter);
+
     VectorXd v0(m), v1(m), h0_mean(n), h1_mean(n);
     MatrixXd vhist, vchist;
     for(int k = 0; k < niter; k++)
@@ -207,6 +210,7 @@ List rbm_fit(
                     sampler.sample(v0, vhist, vchist, min_mcmc, max_mcmc);
                     const int burnin = min_mcmc - 1;
                     const int remain = vchist.cols() - burnin;
+                    tau[k] += vchist.cols();
 
                     v1.noalias() = vhist.col(burnin);
                     h1_mean.noalias() = w.transpose() * v1 + c;
@@ -251,12 +255,15 @@ List rbm_fit(
         } else {
             loglik[k] = eval_loglik ? (loglik_approx(w, b, c, dat, 100, 10)) : (NumericVector::get_na());
         }
+
+        tau[k] /= (N * nchain);
     }
 
     return List::create(
         Rcpp::Named("w") = w,
         Rcpp::Named("b") = b,
         Rcpp::Named("c") = c,
-        Rcpp::Named("loglik") = loglik
+        Rcpp::Named("loglik") = loglik,
+        Rcpp::Named("tau") = tau
     );
 }
