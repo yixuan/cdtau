@@ -1,0 +1,1 @@
+PKG_CPPFLAGS = -I. -march=native #-DEIGEN_MAX_ALIGN_BYTES=64
