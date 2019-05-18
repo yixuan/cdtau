@@ -72,18 +72,21 @@ double loglik_rbm_approx(MapMat w, MapVec b, MapVec c, MapMat dat,
         Rcpp::stop("Dimensions do not match");
 
     RBMSampler sampler(w, b, c);
-    VectorXd v0(m), v(m), vmean(m), h(n), logp(nsamp);
+    VectorXd v0(m), logp(nsamp);
+    MatrixXd vmean(m, nsamp), h(n, nsamp);
     double loglik = 0.0;
 
     for(int i = 0; i < N; i++)
     {
+        v0.noalias() = dat.col(i);
+        sampler.sample_k_mc(v0, vmean, h, nstep, nsamp);
+        vmean.noalias() = w * h;
+        vmean.colwise() += b;
+        apply_sigmoid(vmean);
+
         for(int j = 0; j < nsamp; j++)
         {
-            v0.noalias() = dat.col(random_int(N));
-            sampler.sample_k(v0, v, h, nstep);
-            vmean.noalias() = w * h + b;
-            apply_sigmoid(vmean);
-            logp[j] = loglik_bernoulli(vmean.data(), &dat(0, i), m);
+            logp[j] = loglik_bernoulli(&vmean(0, j), &dat(0, i), m);
         }
         loglik += log_sum_exp(logp);
     }

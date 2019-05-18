@@ -158,6 +158,30 @@ public:
         }
     }
 
+    void sample_k_mc(const Vector& v0, Matrix& v, Matrix& h, int k = 10, int nchain = 10) const
+    {
+        v.resize(m_m, nchain);
+        h.resize(m_n, nchain);
+
+        h.noalias() = m_w.transpose() * v0.replicate(1, nchain);
+        h.colwise() += m_c;
+        apply_sigmoid(h);
+        random_bernoulli(h, h);
+
+        for(int i = 0; i < k; i++)
+        {
+            v.noalias() = m_w * h;
+            v.colwise() += m_b;
+            apply_sigmoid(v);
+            random_bernoulli(v, v);
+
+            h.noalias() = m_w.transpose() * v;
+            h.colwise() += m_c;
+            apply_sigmoid(h);
+            random_bernoulli(h, h);
+        }
+    }
+
     void sample(
         const Vector& v0, Matrix& vhist, Matrix& vchist,
         int min_steps = 1, int max_steps = 100, bool verbose = false

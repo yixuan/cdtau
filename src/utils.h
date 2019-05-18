@@ -37,11 +37,14 @@ void apply_log1exp(Eigen::MatrixBase<Derived>& x)
 }
 
 // res ~ Bernoulli(prob)
-inline void random_bernoulli(const Eigen::VectorXd& prob, Eigen::VectorXd& res)
+template <typename Derived>
+void random_bernoulli(const Eigen::MatrixBase<Derived>& prob, Eigen::MatrixBase<Derived>& res)
 {
     const int n = prob.size();
+    const double* prob_ptr = prob.derived().data();
+    double* res_ptr = res.derived().data();
     for(int i = 0; i < n; i++)
-        res[i] = double(R::unif_rand() <= prob[i]);
+        res_ptr[i] = double(R::unif_rand() <= prob_ptr[i]);
 }
 
 // x * log(p) + (1 - x) * log(1 - p)
