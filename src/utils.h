@@ -36,6 +36,16 @@ void apply_log1exp(Eigen::MatrixBase<Derived>& x)
     }
 }
 
+// res ~ Uniform(0, 1)
+template <typename Derived>
+void random_uniform(Eigen::MatrixBase<Derived>& res)
+{
+    const int n = res.size();
+    double* res_ptr = res.derived().data();
+    for(int i = 0; i < n; i++)
+        res_ptr[i] = R::unif_rand();
+}
+
 // res ~ Bernoulli(prob)
 template <typename Derived>
 void random_bernoulli(const Eigen::MatrixBase<Derived>& prob, Eigen::MatrixBase<Derived>& res)
@@ -45,6 +55,14 @@ void random_bernoulli(const Eigen::MatrixBase<Derived>& prob, Eigen::MatrixBase<
     double* res_ptr = res.derived().data();
     for(int i = 0; i < n; i++)
         res_ptr[i] = double(R::unif_rand() <= prob_ptr[i]);
+}
+
+template <typename Derived>
+void random_bernoulli_uvar(const Eigen::MatrixBase<Derived>& prob,
+                           const Eigen::MatrixBase<Derived>& uvar,
+                           Eigen::MatrixBase<Derived>& res)
+{
+    res.array() = (uvar.array() <= prob.array()).template cast<double>();
 }
 
 // x * log(p) + (1 - x) * log(1 - p)

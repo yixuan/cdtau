@@ -209,7 +209,7 @@ List rbm_fit(
 
                 for(int l = 0; l < nchain; l++)
                 {
-                    sampler.sample(v0, vhist, vchist, min_mcmc, max_mcmc);
+                    sampler.sample(v0, vhist, vchist, min_mcmc, max_mcmc, verbose > 2);
                     const int burnin = min_mcmc - 1;
                     const int remain = vchist.cols() - burnin;
                     tau_sum += vchist.cols();
