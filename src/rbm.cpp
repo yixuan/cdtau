@@ -21,7 +21,9 @@ List rbm_cdk(
     int vis_dim, int hid_dim, MapMat dat,
     int batch_size = 10, double lr = 0.1, int niter = 100,
     int ngibbs = 10, int nchain = 1,
-    bool eval_loglik = false, bool exact_loglik = true, int verbose = 0
+    bool eval_loglik = false, bool exact_loglik = true,
+    int neval_dat = 1000, int neval_mcmc = 100, int neval_step = 10,
+    int verbose = 0
 )
 {
     const int m = vis_dim;
@@ -96,17 +98,28 @@ List rbm_cdk(
             w.noalias() += lr / double(bs) * dw;
         }
 
-        // Compute loglikelihood values if requested
-        MapMat mw(w.data(), m, n);
-        MapVec mb(b.data(), m);
-        MapVec mc(c.data(), n);
-        MapMat mdat(dat.data(), m, N);
-
-        if(exact_loglik)
+        if(eval_loglik)
         {
-            loglik[k] = eval_loglik ? (loglik_rbm(mw, mb, mc, mdat)) : (NumericVector::get_na());
+            // Get a subset of data
+            neval_dat = std::min(neval_dat, N);
+            shuffle(ind);
+            MatrixXd subdat(m, neval_dat);
+            for(int i = 0; i < neval_dat; i++)
+            {
+                subdat.col(i).noalias() = dat.col(ind[i]);
+            }
+
+            // Compute the loglikelihood value
+            MapMat mw(w.data(), m, n);
+            MapVec mb(b.data(), m);
+            MapVec mc(c.data(), n);
+            MapMat mdat(subdat.data(), m, neval_dat);
+
+            loglik[k] = exact_loglik ?
+                        (loglik_rbm(mw, mb, mc, mdat)) :
+                        (loglik_rbm_approx(mw, mb, mc, mdat, neval_mcmc, neval_step));
         } else {
-            loglik[k] = eval_loglik ? (loglik_rbm_approx(mw, mb, mc, mdat, 100, 10)) : (NumericVector::get_na());
+            loglik[k] = NumericVector::get_na();
         }
     }
 
@@ -124,7 +137,9 @@ List rbm_fit(
     int vis_dim, int hid_dim, MapMat dat,
     int batch_size = 10, double lr = 0.1, int niter = 100,
     int min_mcmc = 1, int max_mcmc = 100, int nchain = 1,
-    bool eval_loglik = false, bool exact_loglik = false, int verbose = 0
+    bool eval_loglik = false, bool exact_loglik = false,
+    int neval_dat = 1000, int neval_mcmc = 100, int neval_step = 10,
+    int verbose = 0
 )
 {
     const int m = vis_dim;
@@ -221,17 +236,28 @@ List rbm_fit(
             w.noalias() += lr / double(bs * nchain) * dw;
         }
 
-        // Compute loglikelihood values if requested
-        MapMat mw(w.data(), m, n);
-        MapVec mb(b.data(), m);
-        MapVec mc(c.data(), n);
-        MapMat mdat(dat.data(), m, N);
-
-        if(exact_loglik)
+        if(eval_loglik)
         {
-            loglik[k] = eval_loglik ? (loglik_rbm(mw, mb, mc, mdat)) : (NumericVector::get_na());
+            // Get a subset of data
+            neval_dat = std::min(neval_dat, N);
+            shuffle(ind);
+            MatrixXd subdat(m, neval_dat);
+            for(int i = 0; i < neval_dat; i++)
+            {
+                subdat.col(i).noalias() = dat.col(ind[i]);
+            }
+
+            // Compute the loglikelihood value
+            MapMat mw(w.data(), m, n);
+            MapVec mb(b.data(), m);
+            MapVec mc(c.data(), n);
+            MapMat mdat(subdat.data(), m, neval_dat);
+
+            loglik[k] = exact_loglik ?
+            (loglik_rbm(mw, mb, mc, mdat)) :
+                (loglik_rbm_approx(mw, mb, mc, mdat, neval_mcmc, neval_step));
         } else {
-            loglik[k] = eval_loglik ? (loglik_rbm_approx(mw, mb, mc, mdat, 100, 10)) : (NumericVector::get_na());
+            loglik[k] = NumericVector::get_na();
         }
 
         tau[k] /= (N * nchain);
