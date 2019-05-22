@@ -22,7 +22,7 @@ List rbm_cdk(
     int batch_size = 10, double lr = 0.1, int niter = 100,
     int ngibbs = 10, int nchain = 1,
     bool eval_loglik = false, bool exact_loglik = true,
-    int neval_dat = 1000, int neval_mcmc = 100, int neval_step = 10,
+    int neval_mb = 10, int neval_dat = 1000, int neval_mcmc = 100, int neval_step = 10,
     int verbose = 0
 )
 {
@@ -43,15 +43,15 @@ List rbm_cdk(
     random_normal(c.data(), n, 0.0, 0.1);
     random_normal(w.data(), m * n, 0.0, 0.1);
 
-    // log-likelihood value in each iteration
-    NumericVector loglik(niter);
+    // log-likelihood value
+    std::vector<double> loglik;
 
     VectorXd v0(m), v(m), h(n), h0mean(n);
     MatrixXd vchains(m, nchain), hmeanchains(n, nchain);
     for(int k = 0; k < niter; k++)
     {
         if(verbose > 0)
-            Rcpp::Rcout << "\n===== Iter " << k << " =====" << std::endl;
+            Rcpp::Rcout << "\n===== Iter " << k + 1 << " =====" << std::endl;
 
         // Shuffle observations
         shuffle(ind);
@@ -59,8 +59,9 @@ List rbm_cdk(
         // Update on mini-batches
         for(int i = 0; i < N; i += batch_size)
         {
+            const int batch_id = i / batch_size + 1;
             if(verbose > 1)
-                Rcpp::Rcout << "==> Mini-batch " << i / batch_size << std::endl;
+                Rcpp::Rcout << "==> Mini-batch " << batch_id << std::endl;
 
             // Indices for this mini-batch: i, i+1, ..., i+bs-1
             const int bs = std::min(i + batch_size, N) - i;
@@ -96,30 +97,35 @@ List rbm_cdk(
             b.noalias() += lr / double(bs) * db;
             c.noalias() += lr / double(bs) * dc;
             w.noalias() += lr / double(bs) * dw;
-        }
 
-        if(eval_loglik)
-        {
-            // Get a subset of data
-            neval_dat = std::min(neval_dat, N);
-            shuffle(ind);
-            MatrixXd subdat(m, neval_dat);
-            for(int i = 0; i < neval_dat; i++)
+            // Compute log-likelihood every `neval_mb` mini-batches
+            if(batch_id % neval_mb == 0)
             {
-                subdat.col(i).noalias() = dat.col(ind[i]);
+                if(eval_loglik)
+                {
+                    // Get a subset of data
+                    neval_dat = std::min(neval_dat, N);
+                    shuffle(ind);
+                    MatrixXd subdat(m, neval_dat);
+                    for(int s = 0; s < neval_dat; s++)
+                    {
+                        subdat.col(s).noalias() = dat.col(ind[s]);
+                    }
+
+                    // Compute the loglikelihood value
+                    MapMat mw(w.data(), m, n);
+                    MapVec mb(b.data(), m);
+                    MapVec mc(c.data(), n);
+                    MapMat mdat(subdat.data(), m, neval_dat);
+
+                    const double res = exact_loglik ?
+                                       (loglik_rbm(mw, mb, mc, mdat)) :
+                                       (loglik_rbm_approx(mw, mb, mc, mdat, neval_mcmc, neval_step));
+                    loglik.push_back(res);
+                } else {
+                    loglik.push_back(NumericVector::get_na());
+                }
             }
-
-            // Compute the loglikelihood value
-            MapMat mw(w.data(), m, n);
-            MapVec mb(b.data(), m);
-            MapVec mc(c.data(), n);
-            MapMat mdat(subdat.data(), m, neval_dat);
-
-            loglik[k] = exact_loglik ?
-                        (loglik_rbm(mw, mb, mc, mdat)) :
-                        (loglik_rbm_approx(mw, mb, mc, mdat, neval_mcmc, neval_step));
-        } else {
-            loglik[k] = NumericVector::get_na();
         }
     }
 
@@ -138,7 +144,7 @@ List rbm_fit(
     int batch_size = 10, double lr = 0.1, int niter = 100,
     int min_mcmc = 1, int max_mcmc = 100, int nchain = 1,
     bool eval_loglik = false, bool exact_loglik = false,
-    int neval_dat = 1000, int neval_mcmc = 100, int neval_step = 10,
+    int neval_mb = 10, int neval_dat = 1000, int neval_mcmc = 100, int neval_step = 10,
     int verbose = 0
 )
 {
@@ -159,27 +165,32 @@ List rbm_fit(
     random_normal(c.data(), n, 0.0, 0.1);
     random_normal(w.data(), m * n, 0.0, 0.1);
 
-    // log-likelihood value in each iteration
-    NumericVector loglik(niter);
+    // log-likelihood value
+    std::vector<double> loglik;
 
-    // Average length of Markov chains in each iteration
-    NumericVector tau(niter);
+    // Average length of Markov chains
+    std::vector<double> tau;
 
     VectorXd v0(m), v1(m), h0_mean(n), h1_mean(n);
     MatrixXd vhist, vchist;
     for(int k = 0; k < niter; k++)
     {
         if(verbose > 0)
-            Rcpp::Rcout << "\n===== Iter " << k << " =====" << std::endl;
+            Rcpp::Rcout << "\n===== Iter " << k + 1 << " =====" << std::endl;
 
         // Shuffle observations
         shuffle(ind);
 
+        // Compute length of Markov chains
+        double tau_sum = 0.0;
+        int tau_bs = 0;
+
         // Update on mini-batches
         for(int i = 0; i < N; i += batch_size)
         {
+            const int batch_id = i / batch_size + 1;
             if(verbose > 1)
-                Rcpp::Rcout << "==> Mini-batch " << i / batch_size << std::endl;
+                Rcpp::Rcout << "==> Mini-batch " << batch_id << std::endl;
 
             // Indices for this mini-batch: i, i+1, ..., i+bs-1
             const int bs = std::min(i + batch_size, N) - i;
@@ -201,7 +212,8 @@ List rbm_fit(
                     sampler.sample(v0, vhist, vchist, min_mcmc, max_mcmc);
                     const int burnin = min_mcmc - 1;
                     const int remain = vchist.cols() - burnin;
-                    tau[k] += vchist.cols();
+                    tau_sum += vchist.cols();
+                    tau_bs++;
 
                     v1.noalias() = vhist.col(burnin);
                     h1_mean.noalias() = w.transpose() * v1 + c;
@@ -234,33 +246,41 @@ List rbm_fit(
             b.noalias() += lr / double(bs * nchain) * db;
             c.noalias() += lr / double(bs * nchain) * dc;
             w.noalias() += lr / double(bs * nchain) * dw;
-        }
 
-        if(eval_loglik)
-        {
-            // Get a subset of data
-            neval_dat = std::min(neval_dat, N);
-            shuffle(ind);
-            MatrixXd subdat(m, neval_dat);
-            for(int i = 0; i < neval_dat; i++)
+            // Compute log-likelihood every `neval_mb` mini-batches
+            if(batch_id % neval_mb == 0)
             {
-                subdat.col(i).noalias() = dat.col(ind[i]);
+                if(eval_loglik)
+                {
+                    // Get a subset of data
+                    neval_dat = std::min(neval_dat, N);
+                    shuffle(ind);
+                    MatrixXd subdat(m, neval_dat);
+                    for(int s = 0; s < neval_dat; s++)
+                    {
+                        subdat.col(s).noalias() = dat.col(ind[s]);
+                    }
+
+                    // Compute the loglikelihood value
+                    MapMat mw(w.data(), m, n);
+                    MapVec mb(b.data(), m);
+                    MapVec mc(c.data(), n);
+                    MapMat mdat(subdat.data(), m, neval_dat);
+
+                    const double res = exact_loglik ?
+                    (loglik_rbm(mw, mb, mc, mdat)) :
+                        (loglik_rbm_approx(mw, mb, mc, mdat, neval_mcmc, neval_step));
+                    loglik.push_back(res);
+                } else {
+                    loglik.push_back(NumericVector::get_na());
+                }
+
+                // Compute average chain length and reset taui
+                tau.push_back(tau_sum / tau_bs);
+                tau_sum = 0.0;
+                tau_bs = 0;
             }
-
-            // Compute the loglikelihood value
-            MapMat mw(w.data(), m, n);
-            MapVec mb(b.data(), m);
-            MapVec mc(c.data(), n);
-            MapMat mdat(subdat.data(), m, neval_dat);
-
-            loglik[k] = exact_loglik ?
-            (loglik_rbm(mw, mb, mc, mdat)) :
-                (loglik_rbm_approx(mw, mb, mc, mdat, neval_mcmc, neval_step));
-        } else {
-            loglik[k] = NumericVector::get_na();
         }
-
-        tau[k] /= (N * nchain);
     }
 
     return List::create(
