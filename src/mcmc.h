@@ -3,6 +3,7 @@
 
 #include <RcppEigen.h>
 #include "utils.h"
+#include "utils_simd.h"
 
 class RBMSampler
 {
@@ -54,8 +55,8 @@ private:
         // p2 = q2, so p((v, h) | xi1) / p((v, h) | eta0) = p1(v | h1) / q1(v | hc0)
         Vector vc1mean = m_w * hc0 + m_b;
         apply_sigmoid(vc1mean);
-        double logpxi1 = loglik_bernoulli(v2mean, v2);
-        double logpeta0 = loglik_bernoulli(vc1mean, v2);
+        double logpxi1 = loglik_bernoulli_simd(v2mean, v2);
+        double logpeta0 = loglik_bernoulli_simd(vc1mean, v2);
         double u = R::exp_rand();
         if(u >= logpxi1 - logpeta0)
         {
@@ -70,8 +71,8 @@ private:
         for(int i = 0; i < max_try; i++)
         {
             random_bernoulli(vc1mean, vc1);
-            logpxi1 = loglik_bernoulli(v2mean, vc1);
-            logpeta0 = loglik_bernoulli(vc1mean, vc1);
+            logpxi1 = loglik_bernoulli_simd(v2mean, vc1);
+            logpeta0 = loglik_bernoulli_simd(vc1mean, vc1);
             u = R::exp_rand();
             if(u < logpeta0 - logpxi1)
             {
