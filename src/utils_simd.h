@@ -20,13 +20,13 @@ void apply_log1exp_simd(Eigen::MatrixBase<Derived>& x)
     const int simd_size = xsimd::simd_type<double>::size;
     const int vec_size = n - n % simd_size;
 
-    vec zero;
-    zero ^= zero;
+    vec zero = xsimd::set_simd(0.0);
+    vec one = xsimd::set_simd(1.0);
 
     for(int i = 0; i < vec_size; i += simd_size)
     {
         vec xi = xsimd::load_aligned(xp + i);
-        xi = xsimd::log(1.0 + xsimd::exp(-xsimd::abs(xi))) + xsimd::max(zero, xi);
+        xi = xsimd::log(one + xsimd::exp(-xsimd::abs(xi))) + xsimd::max(zero, xi);
         xi.store_aligned(xp + i);
     }
     for(int i = vec_size; i < n; i++)
@@ -43,15 +43,14 @@ inline double loglik_bernoulli_simd(const double* prob, const double* x, int n)
     const int simd_size = xsimd::simd_type<double>::size;
     const int vec_size = n - n % simd_size;
 
-    vec zero;
-    zero ^= zero;
-    vec half = zero + 0.5;
+    vec one = xsimd::set_simd(1.0);
+    vec half = xsimd::set_simd(0.5);
 
     double res = 0.0;
     for(int i = 0; i < vec_size; i += simd_size)
     {
         vec probi = xsimd::load_aligned(prob + i);
-        vec one_m_probi = 1.0 - probi;
+        vec one_m_probi = one - probi;
         vec xi = xsimd::load_aligned(x + i);
         vec r = xsimd::log(xsimd::select(xi > half, probi, one_m_probi));
         res += xsimd::hadd(r);
