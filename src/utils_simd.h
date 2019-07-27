@@ -21,8 +21,8 @@ void apply_log1exp_simd(Eigen::MatrixBase<Derived>& x)
     const int simd_size = xsimd::simd_type<Scalar>::size;
     const int vec_size = n - n % simd_size;
 
-    vec zero = xsimd::set_simd(0.0);
-    vec one = xsimd::set_simd(1.0);
+    vec zero = xsimd::set_simd(Scalar(0));
+    vec one = xsimd::set_simd(Scalar(1));
 
     for(int i = 0; i < vec_size; i += simd_size)
     {
@@ -32,7 +32,7 @@ void apply_log1exp_simd(Eigen::MatrixBase<Derived>& x)
     }
     for(int i = vec_size; i < n; i++)
     {
-        xp[i] = std::log(1.0 + std::exp(-std::abs(xp[i]))) + std::max(xp[i], 0.0);
+        xp[i] = std::log(Scalar(1) + std::exp(-std::abs(xp[i]))) + std::max(xp[i], Scalar(0));
     }
 }
 
@@ -45,10 +45,10 @@ Scalar loglik_bernoulli_simd(const Scalar* prob, const Scalar* x, int n)
     const int simd_size = xsimd::simd_type<Scalar>::size;
     const int vec_size = n - n % simd_size;
 
-    vec one = xsimd::set_simd(1.0);
-    vec half = xsimd::set_simd(0.5);
+    vec one = xsimd::set_simd(Scalar(1));
+    vec half = xsimd::set_simd(Scalar(0.5));
 
-    Scalar res = 0.0;
+    Scalar res = 0;
     for(int i = 0; i < vec_size; i += simd_size)
     {
         vec probi = xsimd::load_aligned(prob + i);
@@ -59,7 +59,7 @@ Scalar loglik_bernoulli_simd(const Scalar* prob, const Scalar* x, int n)
     }
     for(int i = vec_size; i < n; i++)
     {
-        res += (x[i] > 0.5) ? (std::log(prob[i])) : (std::log(1.0 - prob[i]));
+        res += (x[i] > Scalar(0.5)) ? (std::log(prob[i])) : (std::log(Scalar(1) - prob[i]));
     }
 
     return res;
