@@ -13,11 +13,12 @@ void apply_log1exp_simd(Eigen::MatrixBase<Derived>& x)
      x.array() = x.array().log();
      x.array() += max0; */
 
-    typedef xsimd::batch<double, xsimd::simd_type<double>::size> vec;
+    typedef typename Derived::Scalar Scalar;
+    typedef xsimd::batch<Scalar, xsimd::simd_type<Scalar>::size> vec;
 
-    double* xp = x.derived().data();
+    Scalar* xp = x.derived().data();
     const int n = x.size();
-    const int simd_size = xsimd::simd_type<double>::size;
+    const int simd_size = xsimd::simd_type<Scalar>::size;
     const int vec_size = n - n % simd_size;
 
     vec zero = xsimd::set_simd(0.0);
@@ -36,17 +37,18 @@ void apply_log1exp_simd(Eigen::MatrixBase<Derived>& x)
 }
 
 // x * log(p) + (1 - x) * log(1 - p)
-inline double loglik_bernoulli_simd(const double* prob, const double* x, int n)
+template <typename Scalar>
+Scalar loglik_bernoulli_simd(const Scalar* prob, const Scalar* x, int n)
 {
-    typedef xsimd::batch<double, xsimd::simd_type<double>::size> vec;
+    typedef xsimd::batch<Scalar, xsimd::simd_type<Scalar>::size> vec;
 
-    const int simd_size = xsimd::simd_type<double>::size;
+    const int simd_size = xsimd::simd_type<Scalar>::size;
     const int vec_size = n - n % simd_size;
 
     vec one = xsimd::set_simd(1.0);
     vec half = xsimd::set_simd(0.5);
 
-    double res = 0.0;
+    Scalar res = 0.0;
     for(int i = 0; i < vec_size; i += simd_size)
     {
         vec probi = xsimd::load_aligned(prob + i);
@@ -62,7 +64,8 @@ inline double loglik_bernoulli_simd(const double* prob, const double* x, int n)
 
     return res;
 }
-inline double loglik_bernoulli_simd(const Eigen::VectorXd& prob, const Eigen::VectorXd& x)
+template <typename Scalar>
+Scalar loglik_bernoulli_simd(const Eigen::Matrix<Scalar, Eigen::Dynamic, 1>& prob, const Eigen::Matrix<Scalar, Eigen::Dynamic, 1>& x)
 {
     return loglik_bernoulli_simd(prob.data(), x.data(), prob.size());
 }

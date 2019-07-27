@@ -12,15 +12,17 @@ void apply_sigmoid(Eigen::MatrixBase<Derived>& x)
 }
 
 // log(exp(x1) + ... + exp(xn))
-inline double log_sum_exp(const Eigen::VectorXd& x)
+template <typename Scalar>
+Scalar log_sum_exp(const Eigen::Matrix<Scalar, Eigen::Dynamic, 1>& x)
 {
-    const double xmax = x.maxCoeff();
+    const Scalar xmax = x.maxCoeff();
     return xmax + std::log((x.array() - xmax).exp().sum());
 }
 
 // log(1 + exp(x))
 // https://stackoverflow.com/a/51828104
-inline double log1exp(const double& x)
+template <typename Scalar>
+Scalar log1exp(const Scalar& x)
 {
     return std::log(1.0 + std::exp(-std::abs(x))) + std::max(x, 0.0);
 }
@@ -29,8 +31,10 @@ inline double log1exp(const double& x)
 template <typename Derived>
 void apply_log1exp(Eigen::MatrixBase<Derived>& x)
 {
+    typedef typename Derived::Scalar Scalar;
+
     const int n = x.size();
-    double* xptr = x.derived().data();
+    Scalar* xptr = x.derived().data();
     for(int i = 0; i < n; i++)
     {
         xptr[i] = log1exp(xptr[i]);
@@ -41,17 +45,21 @@ void apply_log1exp(Eigen::MatrixBase<Derived>& x)
 template <typename Derived>
 void random_uniform(Eigen::MatrixBase<Derived>& res)
 {
+    typedef typename Derived::Scalar Scalar;
+
     const int n = res.size();
-    double* res_ptr = res.derived().data();
+    Scalar* res_ptr = res.derived().data();
     for(int i = 0; i < n; i++)
         res_ptr[i] = R::unif_rand();
 }
 template <typename Derived>
 void random_uniform(Eigen::MatrixBase<Derived>& res, std::mt19937& gen)
 {
+    typedef typename Derived::Scalar Scalar;
+
     const int n = res.size();
-    double* res_ptr = res.derived().data();
-    std::uniform_real_distribution<double> distr(0.0, 1.0);
+    Scalar* res_ptr = res.derived().data();
+    std::uniform_real_distribution<Scalar> distr(0.0, 1.0);
     for(int i = 0; i < n; i++)
         res_ptr[i] = distr(gen);
 }
@@ -60,21 +68,25 @@ void random_uniform(Eigen::MatrixBase<Derived>& res, std::mt19937& gen)
 template <typename Derived>
 void random_bernoulli(const Eigen::MatrixBase<Derived>& prob, Eigen::MatrixBase<Derived>& res)
 {
+    typedef typename Derived::Scalar Scalar;
+
     const int n = prob.size();
-    const double* prob_ptr = prob.derived().data();
-    double* res_ptr = res.derived().data();
+    const Scalar* prob_ptr = prob.derived().data();
+    Scalar* res_ptr = res.derived().data();
     for(int i = 0; i < n; i++)
-        res_ptr[i] = double(R::unif_rand() <= prob_ptr[i]);
+        res_ptr[i] = Scalar(R::unif_rand() <= prob_ptr[i]);
 }
 template <typename Derived>
 void random_bernoulli(const Eigen::MatrixBase<Derived>& prob, Eigen::MatrixBase<Derived>& res, std::mt19937& gen)
 {
+    typedef typename Derived::Scalar Scalar;
+
     const int n = prob.size();
-    const double* prob_ptr = prob.derived().data();
-    double* res_ptr = res.derived().data();
-    std::uniform_real_distribution<double> distr(0.0, 1.0);
+    const Scalar* prob_ptr = prob.derived().data();
+    Scalar* res_ptr = res.derived().data();
+    std::uniform_real_distribution<Scalar> distr(0.0, 1.0);
     for(int i = 0; i < n; i++)
-        res_ptr[i] = double(distr(gen) <= prob_ptr[i]);
+        res_ptr[i] = Scalar(distr(gen) <= prob_ptr[i]);
 }
 
 template <typename Derived>
@@ -82,26 +94,31 @@ void random_bernoulli_uvar(const Eigen::MatrixBase<Derived>& prob,
                            const Eigen::MatrixBase<Derived>& uvar,
                            Eigen::MatrixBase<Derived>& res)
 {
-    res.array() = (uvar.array() <= prob.array()).template cast<double>();
+    typedef typename Derived::Scalar Scalar;
+
+    res.array() = (uvar.array() <= prob.array()).template cast<Scalar>();
 }
 
 // x * log(p) + (1 - x) * log(1 - p)
-inline double loglik_bernoulli(const double* prob, const double* x, int n)
+template <typename Scalar>
+Scalar loglik_bernoulli(const Scalar* prob, const Scalar* x, int n)
 {
-    double res = 0.0;
+    Scalar res = 0.0;
     for(int i = 0; i < n; i++)
     {
         res += (x[i] > 0.5) ? (std::log(prob[i])) : (std::log(1.0 - prob[i]));
     }
     return res;
 }
-inline double loglik_bernoulli(const Eigen::VectorXd& prob, const Eigen::VectorXd& x)
+template <typename Scalar>
+Scalar loglik_bernoulli(const Eigen::Matrix<Scalar, Eigen::Dynamic, 1>& prob, const Eigen::Matrix<Scalar, Eigen::Dynamic, 1>& x)
 {
     return loglik_bernoulli(prob.data(), x.data(), prob.size());
 }
 
 // Test x == y
-inline bool all_equal(const Eigen::VectorXd& x, const Eigen::VectorXd& y, const double eps = 1e-12)
+template <typename Scalar>
+bool all_equal(const Eigen::Matrix<Scalar, Eigen::Dynamic, 1>& x, const Eigen::Matrix<Scalar, Eigen::Dynamic, 1>& y, const double eps = 1e-12)
 {
     const int n = x.size();
     for(int i = 0; i < n; i++)
@@ -120,7 +137,8 @@ inline void shuffle(Eigen::VectorXi v)
 }
 
 // x ~ N(mu, sigma^2)
-inline void random_normal(double* x, int n, double mean, double sd)
+template <typename Scalar>
+void random_normal(Scalar* x, int n, Scalar mean, Scalar sd)
 {
     for(int i = 0; i < n; i++)
         x[i] = R::norm_rand() * sd + mean;
