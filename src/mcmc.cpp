@@ -11,7 +11,7 @@ typedef Eigen::Map<MatrixXd> MapMat;
 // [[Rcpp::export]]
 List rbm_sample_k(MapMat w, MapVec b, MapVec c, VectorXd v0, int k = 10)
 {
-    RBMSampler sampler(w, b, c);
+    RBMSampler<double> sampler(w, b, c);
     VectorXd v, h;
 
     sampler.sample_k(v0, v, h, k);
@@ -27,7 +27,7 @@ List rbm_sample_tau(
     int min_steps = 10, int max_steps = 100, bool verbose = false
 )
 {
-    RBMSampler sampler(w, b, c);
+    RBMSampler<double> sampler(w, b, c);
     MatrixXd vhist, vchist;
     std::mt19937 gen(0);
 

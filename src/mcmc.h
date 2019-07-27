@@ -5,11 +5,12 @@
 #include "utils.h"
 #include "utils_simd.h"
 
+template <typename Scalar = double>
 class RBMSampler
 {
 private:
-    typedef Eigen::MatrixXd Matrix;
-    typedef Eigen::VectorXd Vector;
+    typedef Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic> Matrix;
+    typedef Eigen::Matrix<Scalar, Eigen::Dynamic, 1> Vector;
     typedef const Eigen::Ref<const Matrix> RefConstMat;
     typedef const Eigen::Ref<const Vector> RefConstVec;
 
@@ -56,10 +57,10 @@ private:
         // p2 = q2, so p((v, h) | xi1) / p((v, h) | eta0) = p1(v | h1) / q1(v | hc0)
         Vector vc1mean = m_w * hc0 + m_b;
         apply_sigmoid(vc1mean);
-        double logpxi1 = loglik_bernoulli_simd(v2mean, v2);
-        double logpeta0 = loglik_bernoulli_simd(vc1mean, v2);
-        std::exponential_distribution<double> exp_distr(1.0);
-        double u = exp_distr(gen);
+        Scalar logpxi1 = loglik_bernoulli_simd(v2mean, v2);
+        Scalar logpeta0 = loglik_bernoulli_simd(vc1mean, v2);
+        std::exponential_distribution<Scalar> exp_distr(1.0);
+        Scalar u = exp_distr(gen);
         if(u >= logpxi1 - logpeta0)
         {
             if(verbose)
@@ -121,9 +122,9 @@ private:
         // Let the two chains meet with a positive probability
         Vector v2mean = m_w * h2 + m_b;
         apply_sigmoid(v2mean);
-        double logp1 = loglik_bernoulli(v1mean, v1);
-        double logp2 = loglik_bernoulli(v2mean, v1);
-        double u = R::exp_rand();
+        Scalar logp1 = loglik_bernoulli(v1mean, v1);
+        Scalar logp2 = loglik_bernoulli(v2mean, v1);
+        Scalar u = R::exp_rand();
         if(u >= logp1 - logp2)
         {
             if(verbose)
@@ -176,9 +177,9 @@ private:
         // Let the two chains meet with a positive probability
         Vector h2mean = m_w.transpose() * v2 + m_c;
         apply_sigmoid(h2mean);
-        double logp1 = loglik_bernoulli(h1mean, h1);
-        double logp2 = loglik_bernoulli(h2mean, h1);
-        double u = R::exp_rand();
+        Scalar logp1 = loglik_bernoulli(h1mean, h1);
+        Scalar logp2 = loglik_bernoulli(h2mean, h1);
+        Scalar u = R::exp_rand();
         if(u >= logp1 - logp2)
         {
             if(verbose)

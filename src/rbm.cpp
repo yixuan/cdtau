@@ -7,12 +7,19 @@ using Rcpp::List;
 using Eigen::VectorXi;
 using Eigen::VectorXd;
 using Eigen::MatrixXd;
+using Eigen::VectorXf;
+using Eigen::MatrixXf;
 typedef Eigen::Map<VectorXd> MapVec;
 typedef Eigen::Map<MatrixXd> MapMat;
+typedef Eigen::Map<VectorXf> MapVecf;
+typedef Eigen::Map<MatrixXf> MapMatf;
 
 double loglik_rbm(MapMat w, MapVec b, MapVec c, MapMat dat);
+float loglik_rbm(MapMatf w, MapVecf b, MapVecf c, MapMatf dat);
 
 double loglik_rbm_approx(MapMat w, MapVec b, MapVec c, MapMat dat,
+                         int nsamp = 100, int nstep = 100);
+float loglik_rbm_approx(MapMatf w, MapVecf b, MapVecf c, MapMatf dat,
                          int nsamp = 100, int nstep = 100);
 
 // dat [m x N]
@@ -69,7 +76,7 @@ List rbm_cdk(
             db.setZero();
             dc.setZero();
             dw.setZero();
-            RBMSampler sampler(w, b, c);
+            RBMSampler<double> sampler(w, b, c);
 
             // Compute gradient
             for(int j = 0; j < bs; j++)
@@ -148,6 +155,12 @@ List rbm_fit(
     int verbose = 0
 )
 {
+    typedef float Scalar;
+    typedef Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic> Matrix;
+    typedef Eigen::Matrix<Scalar, Eigen::Dynamic, 1> Vector;
+    typedef Eigen::Map<Matrix> MapMat;
+    typedef Eigen::Map<Vector> MapVec;
+
     const int m = vis_dim;
     const int n = hid_dim;
     const int N = dat.cols();
@@ -159,11 +172,11 @@ List rbm_fit(
     VectorXi ind = VectorXi::LinSpaced(N, 0, N - 1);
 
     // Parameters and derivatives
-    VectorXd b(m), db(m), c(n), dc(n);
-    MatrixXd w(m, n), dw(m, n);
-    random_normal(b.data(), m, 0.0, 0.1);
-    random_normal(c.data(), n, 0.0, 0.1);
-    random_normal(w.data(), m * n, 0.0, 0.1);
+    Vector b(m), db(m), c(n), dc(n);
+    Matrix w(m, n), dw(m, n);
+    random_normal(b.data(), m, Scalar(0), Scalar(0.1));
+    random_normal(c.data(), n, Scalar(0), Scalar(0.1));
+    random_normal(w.data(), m * n, Scalar(0), Scalar(0.1));
 
     // log-likelihood value
     std::vector<double> loglik;
@@ -209,19 +222,19 @@ List rbm_fit(
             #pragma omp parallel for shared(seeds, b, c, w, db, dc, dw) reduction(+:tau_bs, tau_sum, disc_sum) schedule(dynamic)
             for(int j = 0; j < bs; j++)
             {
-                RBMSampler sampler(w, b, c);
-                VectorXd v0(m), v1(m), h0_mean(n), h1_mean(n);
-                MatrixXd vhist, vchist;
+                RBMSampler<Scalar> sampler(w, b, c);
+                Vector v0(m), v1(m), h0_mean(n), h1_mean(n);
+                Matrix vhist, vchist;
                 std::mt19937 gen(seeds[j]);
 
                 double tau_t = 0.0, disc_t = 0.0;
-                VectorXd db_t(m), dc_t(n);
-                MatrixXd dw_t(m, n);
+                Vector db_t(m), dc_t(n);
+                Matrix dw_t(m, n);
                 db_t.setZero();
                 dc_t.setZero();
                 dw_t.setZero();
 
-                v0.noalias() = dat.col(ind[i + j]);
+                v0.noalias() = dat.col(ind[i + j]).cast<Scalar>();
                 h0_mean.noalias() = w.transpose() * v0 + c;
                 apply_sigmoid(h0_mean);
 
@@ -236,11 +249,11 @@ List rbm_fit(
                     h1_mean.noalias() = w.transpose() * v1 + c;
                     apply_sigmoid(h1_mean);
 
-                    MatrixXd hhist_mean = w.transpose() * vhist.rightCols(remain);
+                    Matrix hhist_mean = w.transpose() * vhist.rightCols(remain);
                     hhist_mean.colwise() += c;
                     apply_sigmoid(hhist_mean);
 
-                    MatrixXd hchist_mean = w.transpose() * vchist.rightCols(remain);
+                    Matrix hchist_mean = w.transpose() * vchist.rightCols(remain);
                     hchist_mean.colwise() += c;
                     apply_sigmoid(hchist_mean);
 
@@ -262,7 +275,7 @@ List rbm_fit(
                 tau_bs += nchain;
                 tau_sum += tau_t;
                 disc_sum += disc_t;
-                
+
                 #pragma omp critical
                 {
                     db.noalias() += db_t;
@@ -283,10 +296,10 @@ List rbm_fit(
                     // Get a subset of data
                     neval_dat = std::min(neval_dat, N);
                     shuffle(ind);
-                    MatrixXd subdat(m, neval_dat);
+                    Matrix subdat(m, neval_dat);
                     for(int s = 0; s < neval_dat; s++)
                     {
-                        subdat.col(s).noalias() = dat.col(ind[s]);
+                        subdat.col(s).noalias() = dat.col(ind[s]).cast<Scalar>();
                     }
 
                     // Compute the loglikelihood value
