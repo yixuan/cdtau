@@ -21,7 +21,8 @@ private:
 
     // (xi1, eta0) -> (xi2, eta1) -> ...
     // xi = (v, h), eta = (vc, hc)
-    void maxcoup(
+    int maxcoup(
+        std::mt19937& gen,
         const Vector& v1, const Vector& h1, const Vector& vc0, const Vector& hc0,
         Vector& v2, Vector& h2, Vector& vc1, Vector& hc1,
         int max_try = 10, bool verbose = false
@@ -31,12 +32,12 @@ private:
         // p1(v | h1)
         Vector v2mean = m_w * h1 + m_b;
         apply_sigmoid(v2mean);
-        random_bernoulli(v2mean, v2);
+        random_bernoulli(v2mean, v2, gen);
         // p2(h | v)
         Vector h2mean = m_w.transpose() * v2 + m_c;
         apply_sigmoid(h2mean);
         Vector uvar(m_n);
-        random_uniform(uvar);
+        random_uniform(uvar, gen);
         random_bernoulli_uvar(h2mean, uvar, h2);
 
         // If xi1 == eta0, also make xi2 == eta1 and early exit
@@ -46,7 +47,7 @@ private:
                 Rcpp::Rcout << "[ maxcoup ]: -1" << std::endl;
             vc1.noalias() = v2;
             hc1.noalias() = h2;
-            return;
+            return 0;
         }
 
         // Let the two chains meet with a positive probability
@@ -57,23 +58,24 @@ private:
         apply_sigmoid(vc1mean);
         double logpxi1 = loglik_bernoulli_simd(v2mean, v2);
         double logpeta0 = loglik_bernoulli_simd(vc1mean, v2);
-        double u = R::exp_rand();
+        std::exponential_distribution<double> exp_distr(1.0);
+        double u = exp_distr(gen);
         if(u >= logpxi1 - logpeta0)
         {
             if(verbose)
                 Rcpp::Rcout << "[ maxcoup ]: 0" << std::endl;
             vc1.noalias() = v2;
             hc1.noalias() = h2;
-            return;
+            return 0;
         }
 
         // Otherwise, sample the second chain
         for(int i = 0; i < max_try; i++)
         {
-            random_bernoulli(vc1mean, vc1);
+            random_bernoulli(vc1mean, vc1, gen);
             logpxi1 = loglik_bernoulli_simd(v2mean, vc1);
             logpeta0 = loglik_bernoulli_simd(vc1mean, vc1);
-            u = R::exp_rand();
+            u = exp_distr(gen);
             if(u < logpeta0 - logpxi1)
             {
                 if(verbose)
@@ -82,7 +84,7 @@ private:
                 Vector hc1mean = m_w.transpose() * vc1 + m_c;
                 apply_sigmoid(hc1mean);
                 random_bernoulli_uvar(hc1mean, uvar, hc1);
-                return;
+                return i;
             }
         }
         Vector hc1mean = m_w.transpose() * vc1 + m_c;
@@ -91,6 +93,7 @@ private:
 
         if(verbose)
             Rcpp::Rcout << "[ maxcoup ]: max" << std::endl;
+        return max_try;
     }
 
     // Sample couplings of v given h
@@ -260,7 +263,8 @@ public:
     }
 
     // Unbiased sampling
-    void sample(
+    int sample(
+        std::mt19937& gen,
         const Vector& v0, Matrix& vhist, Matrix& vchist,
         int min_steps = 1, int max_steps = 100, bool verbose = false
     ) const
@@ -271,28 +275,30 @@ public:
 
         hmean.noalias() = m_w.transpose() * v0 + m_c;
         apply_sigmoid(hmean);
-        random_bernoulli(hmean, h);  // h0
+        random_bernoulli(hmean, h, gen);  // h0
         vc.noalias() = v0;           // vc0
         hc.noalias() = h;            // hc0
         // random_bernoulli(hmean, hc);
 
         vmean.noalias() = m_w * h + m_b;
         apply_sigmoid(vmean);
-        random_bernoulli(vmean, v);  // v1
+        random_bernoulli(vmean, v, gen);  // v1
         hmean.noalias() = m_w.transpose() * v + m_c;
         apply_sigmoid(hmean);
-        random_bernoulli(hmean, h);  // h1
+        random_bernoulli(hmean, h, gen);  // h1
 
         std::vector<Vector> vs;
         vs.push_back(v);
         std::vector<Vector> vcs;
+
+        int discard = 0;
 
         for(int i = 0; i < max_steps; i++)
         {
             if(verbose)
                 Rcpp::Rcout << "===== Gibbs iteration " << i << " =====" << std::endl;
 
-            maxcoup(v, h, vc, hc, v_next, h_next, vc_next, hc_next, 10, verbose);
+            discard += maxcoup(gen, v, h, vc, hc, v_next, h_next, vc_next, hc_next, 10, verbose);
 
             vs.push_back(v_next);
             vcs.push_back(vc_next);
@@ -321,8 +327,11 @@ public:
             vchist.col(i).noalias() = vcs[i];
         }
         vhist.col(tau).noalias() = vs[tau];
+
+        return discard;
     }
 };
 
 
 #endif  // CDTAU_MCMC_H
+

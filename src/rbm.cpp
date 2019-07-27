@@ -171,8 +171,9 @@ List rbm_fit(
     // Average length of Markov chains
     std::vector<double> tau;
 
-    VectorXd v0(m), v1(m), h0_mean(n), h1_mean(n);
-    MatrixXd vhist, vchist;
+    // Average number of discarded samples in coupling
+    std::vector<double> disc;
+
     for(int k = 0; k < niter; k++)
     {
         if(verbose > 0)
@@ -184,6 +185,9 @@ List rbm_fit(
         // Compute length of Markov chains
         double tau_sum = 0.0;
         int tau_bs = 0;
+
+        // Compute number of discarded samples in coupling
+        double disc_sum = 0.0;
 
         // Update on mini-batches
         for(int i = 0; i < N; i += batch_size)
@@ -198,22 +202,35 @@ List rbm_fit(
             db.setZero();
             dc.setZero();
             dw.setZero();
-            RBMSampler sampler(w, b, c);
+
+            Rcpp::IntegerVector seeds = Rcpp::sample(100000, bs);
 
             // Compute gradient
+            #pragma omp parallel for shared(seeds, b, c, w, db, dc, dw) reduction(+:tau_bs, tau_sum, disc_sum) schedule(dynamic)
             for(int j = 0; j < bs; j++)
             {
+                RBMSampler sampler(w, b, c);
+                VectorXd v0(m), v1(m), h0_mean(n), h1_mean(n);
+                MatrixXd vhist, vchist;
+                std::mt19937 gen(seeds[j]);
+
+                double tau_t = 0.0, disc_t = 0.0;
+                VectorXd db_t(m), dc_t(n);
+                MatrixXd dw_t(m, n);
+                db_t.setZero();
+                dc_t.setZero();
+                dw_t.setZero();
+
                 v0.noalias() = dat.col(ind[i + j]);
                 h0_mean.noalias() = w.transpose() * v0 + c;
                 apply_sigmoid(h0_mean);
 
                 for(int l = 0; l < nchain; l++)
                 {
-                    sampler.sample(v0, vhist, vchist, min_mcmc, max_mcmc, verbose > 2);
+                    disc_t += sampler.sample(gen, v0, vhist, vchist, min_mcmc, max_mcmc, verbose > 2);
                     const int burnin = min_mcmc - 1;
                     const int remain = vchist.cols() - burnin;
-                    tau_sum += vchist.cols();
-                    tau_bs++;
+                    tau_t += vchist.cols();
 
                     v1.noalias() = vhist.col(burnin);
                     h1_mean.noalias() = w.transpose() * v1 + c;
@@ -227,20 +244,31 @@ List rbm_fit(
                     hchist_mean.colwise() += c;
                     apply_sigmoid(hchist_mean);
 
-                    db.noalias() += (-v1 -
+                    db_t.noalias() += (-v1 -
                         vhist.rightCols(remain).rowwise().sum() +
                         vchist.rightCols(remain).rowwise().sum());
-                    dc.noalias() += (-h1_mean -
+                    dc_t.noalias() += (-h1_mean -
                         hhist_mean.rowwise().sum() +
                         hchist_mean.rowwise().sum());
-                    dw.noalias() += (-v1 * h1_mean.transpose() -
+                    dw_t.noalias() += (-v1 * h1_mean.transpose() -
                         vhist.rightCols(remain) * hhist_mean.transpose() +
                         vchist.rightCols(remain) * hchist_mean.transpose());
                 }
 
-                db.noalias() += double(nchain) * v0;
-                dc.noalias() += double(nchain) * h0_mean;
-                dw.noalias() += double(nchain) * v0 * h0_mean.transpose();
+                db_t.noalias() += double(nchain) * v0;
+                dc_t.noalias() += double(nchain) * h0_mean;
+                dw_t.noalias() += double(nchain) * v0 * h0_mean.transpose();
+
+                tau_bs += nchain;
+                tau_sum += tau_t;
+                disc_sum += disc_t;
+                
+                #pragma omp critical
+                {
+                    db.noalias() += db_t;
+                    dc.noalias() += dc_t;
+                    dw.noalias() += dw_t;
+                }
             }
 
             b.noalias() += lr / double(bs * nchain) * db;
@@ -275,6 +303,10 @@ List rbm_fit(
                     loglik.push_back(NumericVector::get_na());
                 }
 
+                // Compute average number of discarded samples in coupling
+                disc.push_back(disc_sum / tau_bs);
+                disc_sum = 0.0;
+
                 // Compute average chain length and reset taui
                 tau.push_back(tau_sum / tau_bs);
                 tau_sum = 0.0;
@@ -288,6 +320,8 @@ List rbm_fit(
         Rcpp::Named("b") = b,
         Rcpp::Named("c") = c,
         Rcpp::Named("loglik") = loglik,
-        Rcpp::Named("tau") = tau
+        Rcpp::Named("tau") = tau,
+        Rcpp::Named("disc") = disc
     );
 }
+

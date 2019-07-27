@@ -29,8 +29,9 @@ List rbm_sample_tau(
 {
     RBMSampler sampler(w, b, c);
     MatrixXd vhist, vchist;
+    std::mt19937 gen(0);
 
-    sampler.sample(v0, vhist, vchist, min_steps, max_steps, verbose);
+    sampler.sample(gen, v0, vhist, vchist, min_steps, max_steps, verbose);
     return List::create(
         Rcpp::Named("v") = vhist,
         Rcpp::Named("vc") = vchist

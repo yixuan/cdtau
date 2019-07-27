@@ -2,6 +2,7 @@
 #define CDTAU_UTILS_H
 
 #include <RcppEigen.h>
+#include <random>
 
 // x => sigmoid(x)
 template <typename Derived>
@@ -45,6 +46,15 @@ void random_uniform(Eigen::MatrixBase<Derived>& res)
     for(int i = 0; i < n; i++)
         res_ptr[i] = R::unif_rand();
 }
+template <typename Derived>
+void random_uniform(Eigen::MatrixBase<Derived>& res, std::mt19937& gen)
+{
+    const int n = res.size();
+    double* res_ptr = res.derived().data();
+    std::uniform_real_distribution<double> distr(0.0, 1.0);
+    for(int i = 0; i < n; i++)
+        res_ptr[i] = distr(gen);
+}
 
 // res ~ Bernoulli(prob)
 template <typename Derived>
@@ -55,6 +65,16 @@ void random_bernoulli(const Eigen::MatrixBase<Derived>& prob, Eigen::MatrixBase<
     double* res_ptr = res.derived().data();
     for(int i = 0; i < n; i++)
         res_ptr[i] = double(R::unif_rand() <= prob_ptr[i]);
+}
+template <typename Derived>
+void random_bernoulli(const Eigen::MatrixBase<Derived>& prob, Eigen::MatrixBase<Derived>& res, std::mt19937& gen)
+{
+    const int n = prob.size();
+    const double* prob_ptr = prob.derived().data();
+    double* res_ptr = res.derived().data();
+    std::uniform_real_distribution<double> distr(0.0, 1.0);
+    for(int i = 0; i < n; i++)
+        res_ptr[i] = double(distr(gen) <= prob_ptr[i]);
 }
 
 template <typename Derived>
