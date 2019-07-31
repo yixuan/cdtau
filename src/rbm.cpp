@@ -24,8 +24,9 @@ float loglik_rbm_approx(MapMatf w, MapVecf b, MapVecf c, MapMatf dat,
 
 // dat [m x N]
 // [[Rcpp::export]]
-List rbm_cdk(
+List rbm_cdk_warm(
     int vis_dim, int hid_dim, MapMat dat,
+    MapVec b0, MapVec c0, MapMat w0,
     int batch_size = 10, double lr = 0.1, int niter = 100,
     int ngibbs = 10, int nchain = 1,
     bool eval_loglik = false, bool exact_loglik = true,
@@ -44,11 +45,8 @@ List rbm_cdk(
     VectorXi ind = VectorXi::LinSpaced(N, 0, N - 1);
 
     // Parameters and derivatives
-    VectorXd b(m), db(m), c(n), dc(n);
-    MatrixXd w(m, n), dw(m, n);
-    random_normal(b.data(), m, 0.0, 0.1);
-    random_normal(c.data(), n, 0.0, 0.1);
-    random_normal(w.data(), m * n, 0.0, 0.1);
+    VectorXd b = b0, db(m), c = c0, dc(n);
+    MatrixXd w = w0, dw(m, n);
 
     // log-likelihood value
     std::vector<double> loglik;
@@ -85,11 +83,7 @@ List rbm_cdk(
                 h0mean.noalias() = w.transpose() * v0 + c;
                 apply_sigmoid(h0mean);
 
-                for(int l = 0; l < nchain; l++)
-                {
-                    sampler.sample_k(v0, v, h, ngibbs);
-                    vchains.col(l).noalias() = v;
-                }
+                sampler.sample_k_mc(v0, vchains, hmeanchains, ngibbs, nchain);
 
                 hmeanchains.noalias() = w.transpose() * vchains;
                 hmeanchains.colwise() += c;
@@ -144,10 +138,43 @@ List rbm_cdk(
     );
 }
 
+// [[Rcpp::export]]
+List rbm_cdk(
+        int vis_dim, int hid_dim, MapMat dat,
+        int batch_size = 10, double lr = 0.1, int niter = 100,
+        int ngibbs = 10, int nchain = 1,
+        bool eval_loglik = false, bool exact_loglik = true,
+        int neval_mb = 10, int neval_dat = 1000, int neval_mcmc = 100, int neval_step = 10,
+        int verbose = 0
+)
+{
+    const int m = vis_dim;
+    const int n = hid_dim;
+
+    // Initial values
+    VectorXd b0(m), c0(n);
+    MatrixXd w0(m, n);
+
+    MapVec b(b0.data(), m);
+    MapVec c(c0.data(), n);
+    MapMat w(w0.data(), m, n);
+
+    random_normal(b.data(), m, 0.0, 0.1);
+    random_normal(c.data(), n, 0.0, 0.1);
+    random_normal(w.data(), m * n, 0.0, 0.1);
+
+    return rbm_cdk_warm(vis_dim, hid_dim, dat, b, c, w,
+                        batch_size, lr, niter, ngibbs, nchain,
+                        eval_loglik, exact_loglik,
+                        neval_mb, neval_dat, neval_mcmc, neval_step,
+                        verbose);
+}
+
 // dat [m x N]
 // [[Rcpp::export]]
-List rbm_fit(
+List rbm_fit_warm(
     int vis_dim, int hid_dim, MapMat dat,
+    MapVec b0, MapVec c0, MapMat w0,
     int batch_size = 10, double lr = 0.1, int niter = 100,
     int min_mcmc = 1, int max_mcmc = 100, int nchain = 1,
     bool eval_loglik = false, bool exact_loglik = false,
@@ -172,11 +199,8 @@ List rbm_fit(
     VectorXi ind = VectorXi::LinSpaced(N, 0, N - 1);
 
     // Parameters and derivatives
-    Vector b(m), db(m), c(n), dc(n);
-    Matrix w(m, n), dw(m, n);
-    random_normal(b.data(), m, Scalar(0), Scalar(0.1));
-    random_normal(c.data(), n, Scalar(0), Scalar(0.1));
-    random_normal(w.data(), m * n, Scalar(0), Scalar(0.1));
+    Vector b = b0.cast<Scalar>(), db(m), c = c0.cast<Scalar>(), dc(n);
+    Matrix w = w0.cast<Scalar>(), dw(m, n);
 
     // log-likelihood value
     std::vector<double> loglik;
@@ -244,6 +268,7 @@ List rbm_fit(
                     const int burnin = min_mcmc - 1;
                     const int remain = vchist.cols() - burnin;
                     tau_t += vchist.cols();
+                    // ::Rprintf("(%d, %d, %d)\n", j, l, vchist.cols());
 
                     v1.noalias() = vhist.col(burnin);
                     h1_mean.noalias() = w.transpose() * v1 + c;
@@ -338,3 +363,35 @@ List rbm_fit(
     );
 }
 
+// [[Rcpp::export]]
+List rbm_fit(
+        int vis_dim, int hid_dim, MapMat dat,
+        int batch_size = 10, double lr = 0.1, int niter = 100,
+        int min_mcmc = 1, int max_mcmc = 100, int nchain = 1,
+        bool eval_loglik = false, bool exact_loglik = false,
+        int neval_mb = 10, int neval_dat = 1000, int neval_mcmc = 100, int neval_step = 10,
+        int verbose = 0
+)
+{
+    const int m = vis_dim;
+    const int n = hid_dim;
+
+    // Initial values
+    VectorXd b0(m), c0(n);
+    MatrixXd w0(m, n);
+
+    MapVec b(b0.data(), m);
+    MapVec c(c0.data(), n);
+    MapMat w(w0.data(), m, n);
+
+    random_normal(b.data(), m, 0.0, 0.1);
+    random_normal(c.data(), n, 0.0, 0.1);
+    random_normal(w.data(), m * n, 0.0, 0.1);
+
+    return rbm_fit_warm(vis_dim, hid_dim, dat, b, c, w,
+                        batch_size, lr, niter,
+                        min_mcmc, max_mcmc, nchain,
+                        eval_loglik, exact_loglik,
+                        neval_mb, neval_dat, neval_mcmc, neval_step,
+                        verbose);
+}
