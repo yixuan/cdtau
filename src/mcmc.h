@@ -263,6 +263,31 @@ public:
         }
     }
 
+    // Sample k steps on multiple chains
+    void sample_k_mc(const Matrix& v0, Matrix& v, Matrix& h, int k = 10, int nchain = 10) const
+    {
+        v.resize(m_m, nchain);
+        h.resize(m_n, nchain);
+
+        h.noalias() = m_w.transpose() * v0;
+        h.colwise() += m_c;
+        apply_sigmoid(h);
+        random_bernoulli(h, h);
+
+        for(int i = 0; i < k; i++)
+        {
+            v.noalias() = m_w * h;
+            v.colwise() += m_b;
+            apply_sigmoid(v);
+            random_bernoulli(v, v);
+
+            h.noalias() = m_w.transpose() * v;
+            h.colwise() += m_c;
+            apply_sigmoid(h);
+            random_bernoulli(h, h);
+        }
+    }
+
     // Unbiased sampling
     int sample(
         std::mt19937& gen,
