@@ -172,6 +172,156 @@ List rbm_cdk(
 
 // dat [m x N]
 // [[Rcpp::export]]
+List rbm_pcdk_warm(
+        int vis_dim, int hid_dim, MapMat dat,
+        MapVec b0, MapVec c0, MapMat w0,
+        int batch_size = 10, double lr = 0.1, int niter = 100,
+        int ngibbs = 10, int nchain = 1,
+        bool eval_loglik = false, bool exact_loglik = true,
+        int neval_mb = 10, int neval_dat = 1000, int neval_mcmc = 100, int neval_step = 10,
+        int verbose = 0
+)
+{
+    const int m = vis_dim;
+    const int n = hid_dim;
+    const int N = dat.cols();
+
+    if(dat.rows() != m)
+        Rcpp::stop("dimensions do not match");
+
+    // Indices of observations
+    VectorXi ind = VectorXi::LinSpaced(N, 0, N - 1);
+
+    // Parameters and derivatives
+    VectorXd b = b0, db(m), c = c0, dc(n);
+    MatrixXd w = w0, dw(m, n);
+
+    // log-likelihood value
+    std::vector<double> loglik;
+
+    VectorXd v0(m), h0mean(n);
+    MatrixXd vchains(m, nchain), hmeanchains(n, nchain);
+
+    vchains.noalias() = dat.leftCols(nchain);
+    for(int k = 0; k < niter; k++)
+    {
+        if(verbose > 0)
+            Rcpp::Rcout << "\n===== Iter " << k + 1 << " =====" << std::endl;
+
+        // Shuffle observations
+        shuffle(ind);
+
+        // Update on mini-batches
+        for(int i = 0; i < N; i += batch_size)
+        {
+            const int batch_id = i / batch_size + 1;
+            if(verbose > 1)
+                Rcpp::Rcout << "==> Mini-batch " << batch_id << std::endl;
+
+            // Indices for this mini-batch: i, i+1, ..., i+bs-1
+            const int bs = std::min(i + batch_size, N) - i;
+            // Initialize gradients and the sampler
+            db.setZero();
+            dc.setZero();
+            dw.setZero();
+            RBMSampler<double> sampler(w, b, c);
+
+            // Compute gradient
+            for(int j = 0; j < bs; j++)
+            {
+                v0.noalias() = dat.col(ind[i + j]);
+                h0mean.noalias() = w.transpose() * v0 + c;
+                apply_sigmoid(h0mean);
+
+                sampler.sample_k_mc(vchains, vchains, hmeanchains, ngibbs, nchain);
+
+                hmeanchains.noalias() = w.transpose() * vchains;
+                hmeanchains.colwise() += c;
+                apply_sigmoid(hmeanchains);
+
+                db.noalias() += (v0 - vchains.rowwise().mean());
+                dc.noalias() += (h0mean - hmeanchains.rowwise().mean());
+                dw.noalias() += (v0 * h0mean.transpose() -
+                    (1.0 / nchain) * vchains * hmeanchains.transpose());
+            }
+
+            b.noalias() += lr / double(bs) * db;
+            c.noalias() += lr / double(bs) * dc;
+            w.noalias() += lr / double(bs) * dw;
+
+            // Compute log-likelihood every `neval_mb` mini-batches
+            if(batch_id % neval_mb == 0)
+            {
+                if(eval_loglik)
+                {
+                    // Get a subset of data
+                    neval_dat = std::min(neval_dat, N);
+                    shuffle(ind);
+                    MatrixXd subdat(m, neval_dat);
+                    for(int s = 0; s < neval_dat; s++)
+                    {
+                        subdat.col(s).noalias() = dat.col(ind[s]);
+                    }
+
+                    // Compute the loglikelihood value
+                    MapMat mw(w.data(), m, n);
+                    MapVec mb(b.data(), m);
+                    MapVec mc(c.data(), n);
+                    MapMat mdat(subdat.data(), m, neval_dat);
+
+                    const double res = exact_loglik ?
+                    (loglik_rbm(mw, mb, mc, mdat)) :
+                        (loglik_rbm_approx(mw, mb, mc, mdat, neval_mcmc, neval_step));
+                    loglik.push_back(res);
+                } else {
+                    loglik.push_back(NumericVector::get_na());
+                }
+            }
+        }
+    }
+
+    return List::create(
+        Rcpp::Named("w") = w,
+        Rcpp::Named("b") = b,
+        Rcpp::Named("c") = c,
+        Rcpp::Named("loglik") = loglik
+    );
+}
+
+// [[Rcpp::export]]
+List rbm_pcdk(
+        int vis_dim, int hid_dim, MapMat dat,
+        int batch_size = 10, double lr = 0.1, int niter = 100,
+        int ngibbs = 10, int nchain = 1,
+        bool eval_loglik = false, bool exact_loglik = true,
+        int neval_mb = 10, int neval_dat = 1000, int neval_mcmc = 100, int neval_step = 10,
+        int verbose = 0
+)
+{
+    const int m = vis_dim;
+    const int n = hid_dim;
+
+    // Initial values
+    VectorXd b0(m), c0(n);
+    MatrixXd w0(m, n);
+
+    MapVec b(b0.data(), m);
+    MapVec c(c0.data(), n);
+    MapMat w(w0.data(), m, n);
+
+    random_normal(b.data(), m, 0.0, 0.1);
+    random_normal(c.data(), n, 0.0, 0.1);
+    random_normal(w.data(), m * n, 0.0, 0.1);
+
+    return rbm_pcdk_warm(vis_dim, hid_dim, dat, b, c, w,
+                        batch_size, lr, niter, ngibbs, nchain,
+                        eval_loglik, exact_loglik,
+                        neval_mb, neval_dat, neval_mcmc, neval_step,
+                        verbose);
+}
+
+// dat [m x N]
+// [[Rcpp::export]]
 List rbm_fit_warm(
     int vis_dim, int hid_dim, MapMat dat,
     MapVec b0, MapVec c0, MapMat w0,
