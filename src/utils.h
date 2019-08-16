@@ -24,7 +24,7 @@ Scalar log_sum_exp(const Eigen::Matrix<Scalar, Eigen::Dynamic, 1>& x)
 template <typename Scalar>
 Scalar log1exp(const Scalar& x)
 {
-    return std::log(1.0 + std::exp(-std::abs(x))) + std::max(x, 0.0);
+    return std::log(Scalar(1) + std::exp(-std::abs(x))) + std::max(x, Scalar(0));
 }
 
 // log(1 + exp(x1)) + ... + log(1 + exp(xn))
@@ -41,7 +41,7 @@ void apply_log1exp(Eigen::MatrixBase<Derived>& x)
     }
 }
 
-// res ~ Uniform(0, 1)
+// res ~ Uniform(0, 1), RNG from R
 template <typename Derived>
 void random_uniform(Eigen::MatrixBase<Derived>& res)
 {
@@ -52,6 +52,7 @@ void random_uniform(Eigen::MatrixBase<Derived>& res)
     for(int i = 0; i < n; i++)
         res_ptr[i] = R::unif_rand();
 }
+// RNG from C++
 template <typename Derived>
 void random_uniform(Eigen::MatrixBase<Derived>& res, std::mt19937& gen)
 {
@@ -64,7 +65,7 @@ void random_uniform(Eigen::MatrixBase<Derived>& res, std::mt19937& gen)
         res_ptr[i] = distr(gen);
 }
 
-// res ~ Bernoulli(prob)
+// res ~ Bernoulli(prob), RNG from R
 template <typename Derived>
 void random_bernoulli(const Eigen::MatrixBase<Derived>& prob, Eigen::MatrixBase<Derived>& res)
 {
@@ -76,6 +77,7 @@ void random_bernoulli(const Eigen::MatrixBase<Derived>& prob, Eigen::MatrixBase<
     for(int i = 0; i < n; i++)
         res_ptr[i] = Scalar(R::unif_rand() <= prob_ptr[i]);
 }
+// RNG from C++
 template <typename Derived>
 void random_bernoulli(const Eigen::MatrixBase<Derived>& prob, Eigen::MatrixBase<Derived>& res, std::mt19937& gen)
 {
@@ -88,7 +90,7 @@ void random_bernoulli(const Eigen::MatrixBase<Derived>& prob, Eigen::MatrixBase<
     for(int i = 0; i < n; i++)
         res_ptr[i] = Scalar(distr(gen) <= prob_ptr[i]);
 }
-
+// res ~ Bernoulli(prob), given prob and uniform random variates
 template <typename Derived>
 void random_bernoulli_uvar(const Eigen::MatrixBase<Derived>& prob,
                            const Eigen::MatrixBase<Derived>& uvar,
