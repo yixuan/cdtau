@@ -37,3 +37,18 @@ List rbm_sample_tau(
         Rcpp::Named("vc") = vchist
     );
 }
+
+/*
+
+ set.seed(123)
+ m = 10
+ n = 10
+ b = rnorm(m, sd = 0.1)
+ c = rnorm(n, sd = 0.1)
+ w = matrix(rnorm(m * n, sd = 1.0), m, n)
+ v0 = rbinom(m, 1, 0.5)
+
+ rbm_sample_k(w, b, c, v0, k = 100)
+ rbm_sample_tau(w, b, c, v0, min_steps = 1, max_steps = 100, verbose = TRUE)
+
+ */
