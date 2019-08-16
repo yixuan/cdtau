@@ -1,5 +1,6 @@
 #include "mcmc.h"
 #include "utils.h"
+#include "likelihood.h"
 
 using Rcpp::NumericMatrix;
 using Rcpp::NumericVector;
@@ -13,14 +14,6 @@ typedef Eigen::Map<VectorXd> MapVec;
 typedef Eigen::Map<MatrixXd> MapMat;
 typedef Eigen::Map<VectorXf> MapVecf;
 typedef Eigen::Map<MatrixXf> MapMatf;
-
-double loglik_rbm(MapMat w, MapVec b, MapVec c, MapMat dat);
-float loglik_rbm(MapMatf w, MapVecf b, MapVecf c, MapMatf dat);
-
-double loglik_rbm_approx(MapMat w, MapVec b, MapVec c, MapMat dat,
-                         int nsamp = 100, int nstep = 100);
-float loglik_rbm_approx(MapMatf w, MapVecf b, MapVecf c, MapMatf dat,
-                         int nsamp = 100, int nstep = 100);
 
 // dat [m x N]
 // [[Rcpp::export]]
@@ -114,14 +107,9 @@ List rbm_cdk_warm(
                     }
 
                     // Compute the loglikelihood value
-                    MapMat mw(w.data(), m, n);
-                    MapVec mb(b.data(), m);
-                    MapVec mc(c.data(), n);
-                    MapMat mdat(subdat.data(), m, neval_dat);
-
                     const double res = exact_loglik ?
-                                       (loglik_rbm(mw, mb, mc, mdat)) :
-                                       (loglik_rbm_approx(mw, mb, mc, mdat, neval_mcmc, neval_step));
+                        (loglik_rbm_exact(m, n, neval_dat, w.data(), b.data(), c.data(), subdat.data())) :
+                        (loglik_rbm_approx(m, n, neval_dat, w.data(), b.data(), c.data(), subdat.data(), neval_mcmc, neval_step));
                     loglik.push_back(res);
                 } else {
                     loglik.push_back(NumericVector::get_na());
@@ -264,14 +252,9 @@ List rbm_pcdk_warm(
                     }
 
                     // Compute the loglikelihood value
-                    MapMat mw(w.data(), m, n);
-                    MapVec mb(b.data(), m);
-                    MapVec mc(c.data(), n);
-                    MapMat mdat(subdat.data(), m, neval_dat);
-
                     const double res = exact_loglik ?
-                    (loglik_rbm(mw, mb, mc, mdat)) :
-                        (loglik_rbm_approx(mw, mb, mc, mdat, neval_mcmc, neval_step));
+                    (loglik_rbm_exact(m, n, neval_dat, w.data(), b.data(), c.data(), subdat.data())) :
+                        (loglik_rbm_approx(m, n, neval_dat, w.data(), b.data(), c.data(), subdat.data(), neval_mcmc, neval_step));
                     loglik.push_back(res);
                 } else {
                     loglik.push_back(NumericVector::get_na());
@@ -335,8 +318,6 @@ List rbm_fit_warm(
     typedef float Scalar;
     typedef Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic> Matrix;
     typedef Eigen::Matrix<Scalar, Eigen::Dynamic, 1> Vector;
-    typedef Eigen::Map<Matrix> MapMat;
-    typedef Eigen::Map<Vector> MapVec;
 
     const int m = vis_dim;
     const int n = hid_dim;
@@ -478,14 +459,9 @@ List rbm_fit_warm(
                     }
 
                     // Compute the loglikelihood value
-                    MapMat mw(w.data(), m, n);
-                    MapVec mb(b.data(), m);
-                    MapVec mc(c.data(), n);
-                    MapMat mdat(subdat.data(), m, neval_dat);
-
                     const double res = exact_loglik ?
-                    (loglik_rbm(mw, mb, mc, mdat)) :
-                        (loglik_rbm_approx(mw, mb, mc, mdat, neval_mcmc, neval_step));
+                    (loglik_rbm_exact(m, n, neval_dat, w.data(), b.data(), c.data(), subdat.data())) :
+                        (loglik_rbm_approx(m, n, neval_dat, w.data(), b.data(), c.data(), subdat.data(), neval_mcmc, neval_step));
                     loglik.push_back(res);
                 } else {
                     loglik.push_back(NumericVector::get_na());
