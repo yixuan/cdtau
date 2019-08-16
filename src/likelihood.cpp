@@ -1,35 +1,10 @@
 #include <RcppEigen.h>
-#include "mcmc.h"
-#include "utils.h"
-#include "utils_simd.h"
+#include "likelihood.h"
 
-using Rcpp::NumericVector;
-using Rcpp::NumericMatrix;
 using Eigen::VectorXd;
 using Eigen::MatrixXd;
-using Eigen::VectorXf;
-using Eigen::MatrixXf;
 typedef Eigen::Map<VectorXd> MapVec;
 typedef Eigen::Map<MatrixXd> MapMat;
-typedef Eigen::Map<VectorXf> MapVecf;
-typedef Eigen::Map<MatrixXf> MapMatf;
-
-// res[n x 2^n]
-template <typename Scalar>
-Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic> permutation(const int n)
-{
-    const int pn = (1 << n);  // 2^n
-    Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic> res(n, pn);
-    Scalar* r = res.data();
-    for(int j = 0; j < pn; j++)
-    {
-        for(int i = 0; i < n; i++, r++)
-        {
-            *r = (j >> i) & 1;
-        }
-    }
-    return res;
-}
 
 // w[m x n], b[m x 1], c[n x 1], dat[m x N]
 // [[Rcpp::export]]
@@ -43,25 +18,7 @@ double loglik_rbm(MapMat w, MapVec b, MapVec c, MapMat dat)
     if(b.size() != m || c.size() != n || dat.rows() != m)
         Rcpp::stop("Dimensions do not match");
 
-    // log(Z)
-    // https://arxiv.org/pdf/1510.02255.pdf, Eqn. (5)
-    MatrixXd vperm = permutation<double>(m);
-    VectorXd logzv = vperm.transpose() * b;
-    MatrixXd vpermwc = w.transpose() * vperm;
-    vpermwc.colwise() += c;
-    apply_log1exp_simd(vpermwc);
-    logzv.noalias() += vpermwc.colwise().sum().transpose();
-    const double logz = log_sum_exp(logzv);
-
-    // https://arxiv.org/pdf/1510.02255.pdf, Eqn. (4)
-    VectorXd loglik(N);
-    VectorXd term1 = dat.transpose() * b;
-    MatrixXd term2 = w.transpose() * dat;
-    term2.colwise() += c;
-    apply_log1exp_simd(term2);
-    loglik.noalias() = term1 + term2.colwise().sum().transpose();
-
-    return loglik.sum() - logz * N;
+    return loglik_rbm_exact(m, n, N, w.data(), b.data(), c.data(), dat.data());
 }
 
 // [[Rcpp::export]]
@@ -76,27 +33,7 @@ double loglik_rbm_approx(MapMat w, MapVec b, MapVec c, MapMat dat,
     if(b.size() != m || c.size() != n || dat.rows() != m)
         Rcpp::stop("Dimensions do not match");
 
-    RBMSampler<double> sampler(w, b, c);
-    VectorXd v0(m), logp(nsamp);
-    MatrixXd vmean(m, nsamp), h(n, nsamp);
-    double loglik = 0.0;
-
-    for(int i = 0; i < N; i++)
-    {
-        v0.noalias() = dat.col(i);
-        sampler.sample_k_mc(v0, vmean, h, nstep, nsamp);
-        vmean.noalias() = w * h;
-        vmean.colwise() += b;
-        apply_sigmoid(vmean);
-
-        for(int j = 0; j < nsamp; j++)
-        {
-            logp[j] = loglik_bernoulli(&vmean(0, j), &dat(0, i), m);
-        }
-        loglik += log_sum_exp(logp);
-    }
-
-    return loglik - N * std::log(double(nsamp));
+    return loglik_rbm_approx(m, n, N, w.data(), b.data(), c.data(), dat.data(), nsamp, nstep);
 }
 
 /*
@@ -121,71 +58,3 @@ double loglik_rbm_approx(MapMat w, MapVec b, MapVec c, MapMat dat,
  loglik_rbm_approx(w, b, c, dat, nsamp = 100, nstep = 100)
 
  */
-
-
-
-// w[m x n], b[m x 1], c[n x 1], dat[m x N]
-float loglik_rbm(MapMatf w, MapVecf b, MapVecf c, MapMatf dat)
-{
-    const int m = w.rows();
-    const int n = w.cols();
-    const int N = dat.cols();
-
-    // Check dimension
-    if(b.size() != m || c.size() != n || dat.rows() != m)
-        Rcpp::stop("Dimensions do not match");
-
-    // log(Z)
-    // https://arxiv.org/pdf/1510.02255.pdf, Eqn. (5)
-    MatrixXf vperm = permutation<float>(m);
-    VectorXf logzv = vperm.transpose() * b;
-    MatrixXf vpermwc = w.transpose() * vperm;
-    vpermwc.colwise() += c;
-    apply_log1exp_simd(vpermwc);
-    logzv.noalias() += vpermwc.colwise().sum().transpose();
-    const float logz = log_sum_exp(logzv);
-
-    // https://arxiv.org/pdf/1510.02255.pdf, Eqn. (4)
-    VectorXf loglik(N);
-    VectorXf term1 = dat.transpose() * b;
-    MatrixXf term2 = w.transpose() * dat;
-    term2.colwise() += c;
-    apply_log1exp_simd(term2);
-    loglik.noalias() = term1 + term2.colwise().sum().transpose();
-
-    return loglik.sum() - logz * N;
-}
-
-float loglik_rbm_approx(MapMatf w, MapVecf b, MapVecf c, MapMatf dat,
-                        int nsamp = 100, int nstep = 10)
-{
-    const int m = w.rows();
-    const int n = w.cols();
-    const int N = dat.cols();
-
-    // Check dimension
-    if(b.size() != m || c.size() != n || dat.rows() != m)
-        Rcpp::stop("Dimensions do not match");
-
-    RBMSampler<float> sampler(w, b, c);
-    VectorXf v0(m), logp(nsamp);
-    MatrixXf vmean(m, nsamp), h(n, nsamp);
-    float loglik = 0.0;
-
-    for(int i = 0; i < N; i++)
-    {
-        v0.noalias() = dat.col(i);
-        sampler.sample_k_mc(v0, vmean, h, nstep, nsamp);
-        vmean.noalias() = w * h;
-        vmean.colwise() += b;
-        apply_sigmoid(vmean);
-
-        for(int j = 0; j < nsamp; j++)
-        {
-            logp[j] = loglik_bernoulli(&vmean(0, j), &dat(0, i), m);
-        }
-        loglik += log_sum_exp(logp);
-    }
-
-    return loglik - N * std::log(float(nsamp));
-}
