@@ -97,116 +97,6 @@ private:
         return max_try;
     }
 
-    // Sample couplings of v given h
-    // p1 = Bernoulli(sigmoid(w * h1 + b))
-    // p2 = Bernoulli(sigmoid(w * h2 + b))
-    void maxcoup_v(
-        const Vector& h1, const Vector& h2, Vector& v1, Vector& v2,
-        int max_try = 10, bool verbose = false
-    ) const
-    {
-        // Sample the first chain
-        Vector v1mean = m_w * h1 + m_b;
-        apply_sigmoid(v1mean);
-        random_bernoulli(v1mean, v1);
-
-        // If h1 == h2, also make v1 == v2 and early exit
-        if(all_equal(h1, h2))
-        {
-            if(verbose)
-                Rcpp::Rcout << "[ maxcoup_v ]: -1" << std::endl;
-            v2.noalias() = v1;
-            return;
-        }
-
-        // Let the two chains meet with a positive probability
-        Vector v2mean = m_w * h2 + m_b;
-        apply_sigmoid(v2mean);
-        Scalar logp1 = loglik_bernoulli(v1mean, v1);
-        Scalar logp2 = loglik_bernoulli(v2mean, v1);
-        Scalar u = R::exp_rand();
-        if(u >= logp1 - logp2)
-        {
-            if(verbose)
-                Rcpp::Rcout << "[ maxcoup_v ]: 0" << std::endl;
-            v2.noalias() = v1;
-            return;
-        }
-
-        // Otherwise, sample the second chain
-        for(int i = 0; i < max_try; i++)
-        {
-            random_bernoulli(v2mean, v2);
-            logp1 = loglik_bernoulli(v1mean, v2);
-            logp2 = loglik_bernoulli(v2mean, v2);
-            u = R::exp_rand();
-            if(u < logp2 - logp1)
-            {
-                if(verbose)
-                    Rcpp::Rcout << "[ maxcoup_v ]: " << i + 1 << std::endl;
-                return;
-            }
-        }
-
-        if(verbose)
-            Rcpp::Rcout << "[ maxcoup_v ]: max" << std::endl;
-    }
-
-    // Sample couplings of h given v
-    // p1 = Bernoulli(sigmoid(w' * v1 + c))
-    // p2 = Bernoulli(sigmoid(w' * v2 + c))
-    void maxcoup_h(
-        const Vector& v1, const Vector& v2, Vector& h1, Vector& h2,
-        int max_try = 10, bool verbose = false
-    ) const
-    {
-        // Sample the first chain
-        Vector h1mean = m_w.transpose() * v1 + m_c;
-        apply_sigmoid(h1mean);
-        random_bernoulli(h1mean, h1);
-
-        // If v1 == v2, also make h1 == h2 and early exit
-        if(all_equal(v1, v2))
-        {
-            if(verbose)
-                Rcpp::Rcout << "[ maxcoup_h ]: -1" << std::endl;
-            h2.noalias() = h1;
-            return;
-        }
-
-        // Let the two chains meet with a positive probability
-        Vector h2mean = m_w.transpose() * v2 + m_c;
-        apply_sigmoid(h2mean);
-        Scalar logp1 = loglik_bernoulli(h1mean, h1);
-        Scalar logp2 = loglik_bernoulli(h2mean, h1);
-        Scalar u = R::exp_rand();
-        if(u >= logp1 - logp2)
-        {
-            if(verbose)
-                Rcpp::Rcout << "[ maxcoup_h ]: 0" << std::endl;
-            h2.noalias() = h1;
-            return;
-        }
-
-        // Otherwise, sample the second chain
-        for(int i = 0; i < max_try; i++)
-        {
-            random_bernoulli(h2mean, h2);
-            logp1 = loglik_bernoulli(h1mean, h2);
-            logp2 = loglik_bernoulli(h2mean, h2);
-            u = R::exp_rand();
-            if(u < logp2 - logp1)
-            {
-                if(verbose)
-                    Rcpp::Rcout << "[ maxcoup_h ]: " << i + 1 << std::endl;
-                return;
-            }
-        }
-
-        if(verbose)
-            Rcpp::Rcout << "[ maxcoup_h ]: max" << std::endl;
-    }
-
 public:
     RBMSampler(RefConstMat& w, RefConstVec& b, RefConstVec& c) :
         m_m(w.rows()), m_n(w.cols()), m_b(b), m_c(c), m_w(w)
@@ -238,7 +128,7 @@ public:
         }
     }
 
-    // Sample k steps on multiple chains
+    // Sample k steps on multiple chains, using the same initial vector
     void sample_k_mc(const Vector& v0, Matrix& v, Matrix& h, int k = 10, int nchain = 10) const
     {
         v.resize(m_m, nchain);
@@ -263,7 +153,7 @@ public:
         }
     }
 
-    // Sample k steps on multiple chains
+    // Sample k steps on multiple chains, using multiple initial values
     void sample_k_mc(const Matrix& v0, Matrix& v, Matrix& h, int k = 10, int nchain = 10) const
     {
         v.resize(m_m, nchain);
