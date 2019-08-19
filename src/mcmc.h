@@ -13,6 +13,7 @@ private:
     typedef Eigen::Matrix<Scalar, Eigen::Dynamic, 1> Vector;
     typedef const Eigen::Ref<const Matrix> RefConstMat;
     typedef const Eigen::Ref<const Vector> RefConstVec;
+    typedef Eigen::Ref<Vector> RefVec;
 
     const int   m_m;
     const int   m_n;
@@ -181,7 +182,7 @@ public:
     // Unbiased sampling
     int sample(
         std::mt19937& gen,
-        const Vector& vc0, const Vector& hc0, const Vector& v1, const Vector& h1,
+        RefVec vc0, RefVec hc0, RefVec v1, RefVec h1,
         Matrix& vhist, Matrix& vchist,
         int min_steps = 1, int max_steps = 100, bool verbose = false
     ) const
@@ -215,20 +216,26 @@ public:
             vs.push_back(v_next);
             vcs.push_back(vc_next);
 
-            v.swap(v_next);
-            h.swap(h_next);
-            vc.swap(vc_next);
-            hc.swap(hc_next);
-
             if((i >= min_steps - 1) &&
-               (all_equal(v, vc)) &&
-               (all_equal(h, hc)))
+               (all_equal(v_next, vc_next)) &&
+               (all_equal(h_next, hc_next)))
             {
                 if(verbose)
                     Rcpp::Rcout << "===== Exit with meeting time = " << i + 1 << " =====" << std::endl;
                 break;
             }
+
+            v.swap(v_next);
+            h.swap(h_next);
+            vc.swap(vc_next);
+            hc.swap(hc_next);
         }
+
+        // Reset initial values
+        vc0.noalias() = vc;
+        hc0.noalias() = hc;
+        v1.noalias() = v;
+        h1.noalias() = h;
 
         const int tau = vcs.size();
         vhist.resize(m_m, tau + 1);
@@ -256,18 +263,17 @@ public:
         // Stop: (vt, ht) = (vct, hct)
         Vector v(m_m), h(m_n), vc(m_m), hc(m_n);
 
-        h.noalias() = m_w.transpose() * v0 + m_c;
-        apply_sigmoid(h);
-        random_bernoulli(h, h, gen);  // h0
-        vc.noalias() = v0;            // vc0
-        hc.noalias() = h;             // hc0
+        vc.noalias() = v0;              // vc0 = v0
+        hc.noalias() = m_w.transpose() * vc + m_c;
+        apply_sigmoid(hc);
+        random_bernoulli(hc, hc, gen);  // hc0 = h0
 
-        v.noalias() = m_w * h + m_b;
+        v.noalias() = m_w * hc + m_b;
         apply_sigmoid(v);
-        random_bernoulli(v, v, gen);  // v1
+        random_bernoulli(v, v, gen);    // v1
         h.noalias() = m_w.transpose() * v + m_c;
         apply_sigmoid(h);
-        random_bernoulli(h, h, gen);  // h1
+        random_bernoulli(h, h, gen);    // h1
 
         return sample(gen, vc, hc, v, h, vhist, vchist, min_steps, max_steps, verbose);
     }
