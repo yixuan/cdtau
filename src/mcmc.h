@@ -181,27 +181,23 @@ public:
     // Unbiased sampling
     int sample(
         std::mt19937& gen,
-        const Vector& v0, Matrix& vhist, Matrix& vchist,
+        const Vector& vc0, const Vector& hc0, const Vector& v1, const Vector& h1,
+        Matrix& vhist, Matrix& vchist,
         int min_steps = 1, int max_steps = 100, bool verbose = false
     ) const
     {
-        Vector vmean(m_m), hmean(m_n);
+        // (v0, h0)   -> (v1, h1)   -> (v2, h2)   -> ... -> (vt, ht)
+        //               (vc0, hc0) -> (vc1, hc1) -> ... -> (vct, hct)
+        // Init: (v0, h0) = (vc0, hc0)
+        // Iter: (v1, h1, vc0, hc0) -> (v2, h2, vc1, hc1) -> ...
+        // Stop: (vt, ht) = (vct, hct)
         Vector v(m_m), h(m_n), vc(m_m), hc(m_n);
         Vector v_next(m_m), h_next(m_n), vc_next(m_m), hc_next(m_n);
 
-        hmean.noalias() = m_w.transpose() * v0 + m_c;
-        apply_sigmoid(hmean);
-        random_bernoulli(hmean, h, gen);  // h0
-        vc.noalias() = v0;           // vc0
-        hc.noalias() = h;            // hc0
-        // random_bernoulli(hmean, hc);
-
-        vmean.noalias() = m_w * h + m_b;
-        apply_sigmoid(vmean);
-        random_bernoulli(vmean, v, gen);  // v1
-        hmean.noalias() = m_w.transpose() * v + m_c;
-        apply_sigmoid(hmean);
-        random_bernoulli(hmean, h, gen);  // h1
+        vc.noalias() = vc0;
+        hc.noalias() = hc0;
+        v.noalias() = v1;
+        h.noalias() = h1;
 
         std::vector<Vector> vs;
         vs.push_back(v);
@@ -245,6 +241,35 @@ public:
         vhist.col(tau).noalias() = vs[tau];
 
         return discard;
+    }
+
+    int sample(
+        std::mt19937& gen,
+        const Vector& v0, Matrix& vhist, Matrix& vchist,
+        int min_steps = 1, int max_steps = 100, bool verbose = false
+    ) const
+    {
+        // (v0, h0)   -> (v1, h1)   -> (v2, h2)   -> ... -> (vt, ht)
+        //               (vc0, hc0) -> (vc1, hc1) -> ... -> (vct, hct)
+        // Init: (v0, h0) = (vc0, hc0)
+        // Iter: (v1, h1, vc0, hc0) -> (v2, h2, vc1, hc1) -> ...
+        // Stop: (vt, ht) = (vct, hct)
+        Vector v(m_m), h(m_n), vc(m_m), hc(m_n);
+
+        h.noalias() = m_w.transpose() * v0 + m_c;
+        apply_sigmoid(h);
+        random_bernoulli(h, h, gen);  // h0
+        vc.noalias() = v0;            // vc0
+        hc.noalias() = h;             // hc0
+
+        v.noalias() = m_w * h + m_b;
+        apply_sigmoid(v);
+        random_bernoulli(v, v, gen);  // v1
+        h.noalias() = m_w.transpose() * v + m_c;
+        apply_sigmoid(h);
+        random_bernoulli(h, h, gen);  // h1
+
+        return sample(gen, vc, hc, v, h, vhist, vchist, min_steps, max_steps, verbose);
     }
 };
 
