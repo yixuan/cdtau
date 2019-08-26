@@ -406,6 +406,7 @@ public:
         // use data for vc0
         vc0.noalias() = vi.replicate(1, m_nchain);
         Vector hi = m_w.transpose() * vi + m_c;
+        apply_sigmoid(hi);
         random_bernoulli(hi, hi, gen);
         hc0.noalias() = hi.replicate(1, m_nchain);
 
