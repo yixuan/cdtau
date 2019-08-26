@@ -29,7 +29,7 @@ List rbm_sample_tau(
 {
     RBMSampler<double> sampler(w, b, c);
     MatrixXd vhist, vchist;
-    std::mt19937 gen(0);
+    std::mt19937 gen(int(R::unif_rand() * 10000));
 
     sampler.sample(gen, v0, vhist, vchist, min_steps, max_steps, verbose);
     return List::create(
