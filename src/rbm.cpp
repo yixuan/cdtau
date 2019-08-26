@@ -327,12 +327,16 @@ private:
     Vector    m_dc;
     Matrix    m_dw;
 
-    Matrix    m_vinit;
+    Matrix    m_vc0;
+    Matrix    m_hc0;
+    Matrix    m_v1;
+    Matrix    m_h1;
 
 public:
     RBMUCD(int m, int n, int nchain) :
         m_m(m), m_n(n), m_nchain(nchain),
-        m_b(m), m_c(n), m_w(m, n), m_db(m), m_dc(n), m_dw(m, n), m_vinit(m, nchain)
+        m_b(m), m_c(n), m_w(m, n), m_db(m), m_dc(n), m_dw(m, n),
+        m_vc0(m, nchain), m_hc0(n, nchain), m_v1(m, nchain), m_h1(n, nchain)
     {
         random_normal(m_b.data(), m, Scalar(0), Scalar(0.1));
         random_normal(m_c.data(), n, Scalar(0), Scalar(0.1));
@@ -345,16 +349,30 @@ public:
            Eigen::Map< Eigen::Matrix<OtherScalar, Eigen::Dynamic, 1> > c0,
            Eigen::Map< Eigen::Matrix<OtherScalar, Eigen::Dynamic, Eigen::Dynamic> > w0) :
         m_m(m), m_n(n), m_nchain(nchain),
-        m_b(m), m_c(n), m_w(m, n), m_db(m), m_dc(n), m_dw(m, n), m_vinit(m, nchain)
+        m_b(m), m_c(n), m_w(m, n), m_db(m), m_dc(n), m_dw(m, n),
+        m_vc0(m, nchain), m_hc0(n, nchain), m_v1(m, nchain), m_h1(n, nchain)
     {
         m_b.noalias() = b0.template cast<Scalar>();
         m_c.noalias() = c0.template cast<Scalar>();
         m_w.noalias() = w0.template cast<Scalar>();
     }
 
-    void init_v(RefConstMat& v0)
+    void init_vh(RefConstMat& v0)
     {
-        m_vinit.noalias() = v0.leftCols(m_nchain);
+        m_vc0.noalias() = v0.leftCols(m_nchain);    // vc0 = v0
+        m_hc0.noalias() = m_w.transpose() * m_vc0;
+        m_hc0.colwise() += m_c;
+        apply_sigmoid(m_hc0);
+        random_bernoulli(m_hc0, m_hc0);             // hc0 = h0
+
+        m_v1.noalias() = m_w * m_hc0;
+        m_v1.colwise() += m_b;
+        apply_sigmoid(m_v1);
+        random_bernoulli(m_v1, m_v1);               // v1
+        m_h1.noalias() = m_w.transpose() * m_v1;
+        m_h1.colwise() += m_c;
+        apply_sigmoid(m_h1);
+        random_bernoulli(m_h1, m_h1);               // h1
     }
 
     void zero_grad()
@@ -379,8 +397,28 @@ public:
         // Sampler
         std::mt19937 gen(seed);
         RBMSampler<Scalar> sampler(m_w, m_b, m_c);
-        // Make a copy of the initial values of v
-        Matrix vinit = m_vinit;
+        // Make a copy of the initial values of v and h
+        Matrix vc0 = m_vc0, hc0 = m_hc0, v1 = m_v1, h1 = m_h1;
+
+
+
+        // Right now still use the traditional initialization --
+        // use data for vc0
+        vc0.noalias() = vi.replicate(1, m_nchain);
+        Vector hi = m_w.transpose() * vi + m_c;
+        random_bernoulli(hi, hi, gen);
+        hc0.noalias() = hi.replicate(1, m_nchain);
+
+        v1.noalias() = m_w * hc0;
+        v1.colwise() += m_b;
+        apply_sigmoid(v1);
+        random_bernoulli(v1, v1, gen);               // v1
+        h1.noalias() = m_w.transpose() * v1;
+        h1.colwise() += m_c;
+        apply_sigmoid(h1);
+        random_bernoulli(h1, h1, gen);               // h1
+
+
 
         // MCMC path
         Vector vk(m_m), hk_mean(m_n);
@@ -397,7 +435,10 @@ public:
         // Run multiple chains
         for(int l = 0; l < m_nchain; l++)
         {
-            disc_t += sampler.sample(gen, vinit.col(l), vhist, vchist, min_mcmc, max_mcmc, verbose > 2);
+            disc_t += sampler.sample(
+                gen, vc0.col(l), hc0.col(l), v1.col(l), h1.col(l),
+                vhist, vchist, min_mcmc, max_mcmc, verbose > 2
+            );
             const int burnin = min_mcmc - 1;
             const int remain = vchist.cols() - burnin;
             tau_t += vchist.cols();
@@ -427,9 +468,6 @@ public:
                 vk * hk_mean.transpose() + vhist.rightCols(remain) * hhist_mean.transpose() -
                 vchist.rightCols(remain) * hchist_mean.transpose()
             );
-
-            // Update initial value for v
-            vinit.col(l).noalias() = vchist.template rightCols<1>();
         }
 
         tau_t /= Scalar(m_nchain);
@@ -446,7 +484,10 @@ public:
             m_db.noalias() += db_t;
             m_dc.noalias() += dc_t;
             m_dw.noalias() += dw_t;
-            m_vinit.noalias() = vinit;
+            m_vc0.noalias() = vc0;
+            m_hc0.noalias() = hc0;
+            m_v1.noalias() = v1;
+            m_h1.noalias() = h1;
         }
     }
 
@@ -498,7 +539,7 @@ List rbm_fit_warm(
 
     // RBM model
     RBMUCD<Scalar> rbm(m, n, nchain, b0, c0, w0);
-    rbm.init_v(dat.leftCols(nchain).cast<Scalar>());
+    // rbm.init_vh(dat.leftCols(nchain).cast<Scalar>());
 
     // log-likelihood value
     std::vector<Scalar> loglik;
@@ -547,7 +588,6 @@ List rbm_fit_warm(
                 Vector vi = dat.col(ind[i + j]).cast<Scalar>();
                 Scalar tau_t = 0.0, disc_t = 0.0;
 
-                // rbm.init_v(vi.replicate(1, nchain));
                 rbm.accumulate_grad(vi, seeds[j], min_mcmc, max_mcmc, verbose, tau_t, disc_t);
 
                 tau_sum += tau_t;
