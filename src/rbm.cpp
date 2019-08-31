@@ -3,9 +3,230 @@
 #include "utils.h"
 #include "likelihood.h"
 
+template <typename Scalar = float>
+class RBM
+{
+private:
+    typedef Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic> Matrix;
+    typedef Eigen::Matrix<Scalar, Eigen::Dynamic, 1> Vector;
+    typedef const Eigen::Ref<const Matrix> RefConstMat;
+    typedef const Eigen::Ref<const Vector> RefConstVec;
+
+    const int m_m;
+    const int m_n;
+    const int m_nchain;
+
+    Vector    m_b;
+    Vector    m_c;
+    Matrix    m_w;
+
+    Vector    m_db1;
+    Vector    m_dc1;
+    Matrix    m_dw1;
+
+    Vector    m_db2;
+    Vector    m_dc2;
+    Matrix    m_dw2;
+
+    Matrix    m_vc0;
+    Matrix    m_hc0;
+
+    Matrix    m_vchains;
+    Matrix    m_hchains;
+
+public:
+    RBM(int m, int n, int nchain) :
+        m_m(m), m_n(n), m_nchain(nchain),
+        m_b(m), m_c(n), m_w(m, n),
+        m_db1(m), m_dc1(n), m_dw1(m, n), m_db2(m), m_dc2(n), m_dw2(m, n),
+        m_vc0(m, nchain), m_hc0(n, nchain), m_vchains(m, nchain), m_hchains(n, nchain)
+    {
+        random_normal(m_b.data(), m, Scalar(0), Scalar(0.1));
+        random_normal(m_c.data(), n, Scalar(0), Scalar(0.1));
+        random_normal(m_w.data(), m * n, Scalar(0), Scalar(0.1));
+    }
+
+    template <typename OtherScalar>
+    RBM(int m, int n, int nchain,
+        Eigen::Map< Eigen::Matrix<OtherScalar, Eigen::Dynamic, 1> > b0,
+        Eigen::Map< Eigen::Matrix<OtherScalar, Eigen::Dynamic, 1> > c0,
+        Eigen::Map< Eigen::Matrix<OtherScalar, Eigen::Dynamic, Eigen::Dynamic> > w0) :
+        m_m(m), m_n(n), m_nchain(nchain),
+        m_b(m), m_c(n), m_w(m, n),
+        m_db1(m), m_dc1(n), m_dw1(m, n), m_db2(m), m_dc2(n), m_dw2(m, n),
+        m_vc0(m, nchain), m_hc0(n, nchain), m_vchains(m, nchain), m_hchains(n, nchain)
+    {
+        m_b.noalias() = b0.template cast<Scalar>();
+        m_c.noalias() = c0.template cast<Scalar>();
+        m_w.noalias() = w0.template cast<Scalar>();
+    }
+
+    // Log-likelihood value
+    template <typename Derived>
+    Scalar loglik(Eigen::MatrixBase<Derived>& dat, bool exact = false, int nobs = 100, int nmc = 30, int nstep = 10) const
+    {
+        // Get a subset of data
+        const int N = dat.cols();
+        nobs = std::min(nobs, N);
+        Matrix subdat(m_m, nobs);
+        if(exact)
+        {
+            subdat.noalias() = dat.leftCols(nobs).template cast<Scalar>();
+        } else {
+            for(int i = 0; i < nobs; i++)
+            {
+                subdat.col(i).noalias() = dat.col(int(R::unif_rand() * N)).template cast<Scalar>();
+            }
+        }
+
+        const Scalar res = exact ?
+            (loglik_rbm_exact(m_m, m_n, nobs, m_w.data(), m_b.data(), m_c.data(), subdat.data())) :
+            (loglik_rbm_approx(m_m, m_n, nobs, m_w.data(), m_b.data(), m_c.data(), subdat.data(), nmc, nstep));
+
+        return res;
+    }
+
+    // First term of the gradient
+    // Mini-batch vmb [m x b]
+    void compute_grad1(RefConstMat& vmb)
+    {
+        const int bs = vmb.cols();
+
+        // Mean of hidden units given vmb
+        Matrix hmean(m_n, bs);
+        hmean.noalias() = m_w.transpose() * vmb;
+        hmean.colwise() += m_c;
+        apply_sigmoid(hmean);
+
+        m_db1.noalias() = vmb.rowwise().mean();
+        m_dc1.noalias() = hmean.rowwise().mean();
+        m_dw1.noalias() = (1.0 / bs) * vmb * hmean.transpose();
+    }
+
+    // Zero out gradients
+    void zero_grad2()
+    {
+        m_db2.setZero();
+        m_dc2.setZero();
+        m_dw2.setZero();
+    }
+
+    // Initialize Gibbs sampler using ramdomly selected observations
+    // dat [m x N]
+    template <typename Derived>
+    void init_v0(Eigen::MatrixBase<Derived>& dat)
+    {
+        const int N = dat.cols();
+        for(int i = 0; i < m_nchain; i++)
+        {
+            m_vc0.col(i).noalias() = dat.col(int(R::unif_rand() * N)).template cast<Scalar>();
+        }
+    }
+
+    // Compute the second term of gradient using CD-k
+    void accumulate_grad2_cdk(int k)
+    {
+        // Gibbs samples
+        RBMSampler<Scalar> sampler(m_w, m_b, m_c);
+        sampler.sample_k_mc(m_vc0, m_vchains, m_hchains, k, m_nchain);
+
+        // Second term of gradient
+        m_hchains.noalias() = m_w.transpose() * m_vchains;
+        m_hchains.colwise() += m_c;
+        apply_sigmoid(m_hchains);
+
+        m_db2.noalias() = m_vchains.rowwise().sum();
+        m_dc2.noalias() = m_hchains.rowwise().sum();
+        m_dw2.noalias() = m_vchains * m_hchains.transpose();
+    }
+
+    // Compute the second term of gradient using PCD-k
+    void accumulate_grad2_pcdk(int k)
+    {
+        // Gibbs samples
+        RBMSampler<Scalar> sampler(m_w, m_b, m_c);
+        Matrix& vchains = m_vc0;
+        // vchains will be updated to the last state of the Markov chain
+        sampler.sample_k_mc(vchains, vchains, m_hchains, k, m_nchain);
+
+        // Second term of gradient
+        m_hchains.noalias() = m_w.transpose() * vchains;
+        m_hchains.colwise() += m_c;
+        apply_sigmoid(m_hchains);
+
+        m_db2.noalias() = vchains.rowwise().sum();
+        m_dc2.noalias() = m_hchains.rowwise().sum();
+        m_dw2.noalias() = vchains * m_hchains.transpose();
+    }
+
+    // Compute the second term of gradient using unbiased CD
+    void accumulate_grad2_ucd(int id, int seed, int min_mcmc, int max_mcmc, int verbose, Scalar& tau_t, Scalar& disc_t)
+    {
+        // Sampler
+        std::mt19937 gen(seed);
+        RBMSampler<Scalar> sampler(m_w, m_b, m_c);
+
+        // MCMC path
+        Vector vk(m_m), hk_mean(m_n);
+        Matrix vhist, vchist;
+
+        // # discarded samples
+        disc_t = sampler.sample(gen, m_vc0.col(id), vhist, vchist, min_mcmc, max_mcmc, verbose > 2);
+        const int burnin = min_mcmc - 1;
+        const int remain = vchist.cols() - burnin;
+        // Chain length
+        tau_t += vchist.cols();
+
+        vk.noalias() = vhist.col(burnin);
+        hk_mean.noalias() = m_w.transpose() * vk + m_c;
+        apply_sigmoid(hk_mean);
+
+        Matrix hhist_mean = m_w.transpose() * vhist.rightCols(remain);
+        hhist_mean.colwise() += m_c;
+        apply_sigmoid(hhist_mean);
+
+        Matrix hchist_mean = m_w.transpose() * vchist.rightCols(remain);
+        hchist_mean.colwise() += m_c;
+        apply_sigmoid(hchist_mean);
+
+        // Compute the second term of gradient
+        Vector db_t = Vector::Zero(m_m), dc_t = Vector::Zero(m_n);
+        Matrix dw_t = Matrix::Zero(m_m, m_n);
+
+        db_t.noalias() = vk + vhist.rightCols(remain).rowwise().sum() -
+            vchist.rightCols(remain).rowwise().sum();
+        dc_t.noalias() = hk_mean + hhist_mean.rowwise().sum() -
+            hchist_mean.rowwise().sum();
+        dw_t.noalias() = vk * hk_mean.transpose() +
+            vhist.rightCols(remain) * hhist_mean.transpose() -
+            vchist.rightCols(remain) * hchist_mean.transpose();
+
+        // Accumulate gradients
+        #pragma omp critical
+        {
+            m_db2.noalias() += db_t;
+            m_dc2.noalias() += dc_t;
+            m_dw2.noalias() += dw_t;
+        }
+    }
+
+    void update_param(Scalar lr, int n2)
+    {
+        m_b.noalias() += lr * (m_db1 - m_db2 / n2);
+        m_c.noalias() += lr * (m_dc1 - m_dc2 / n2);
+        m_w.noalias() += lr * (m_dw1 - m_dw2 / n2);
+    }
+
+    const Matrix& get_w() const { return m_w; }
+    const Vector& get_b() const { return m_b; }
+    const Vector& get_c() const { return m_c; }
+};
+
+
 using Rcpp::NumericMatrix;
 using Rcpp::NumericVector;
 using Rcpp::List;
+
 using Eigen::VectorXi;
 using Eigen::VectorXd;
 using Eigen::MatrixXd;
@@ -13,8 +234,6 @@ using Eigen::VectorXf;
 using Eigen::MatrixXf;
 typedef Eigen::Map<VectorXd> MapVec;
 typedef Eigen::Map<MatrixXd> MapMat;
-typedef Eigen::Map<VectorXf> MapVecf;
-typedef Eigen::Map<MatrixXf> MapMatf;
 
 // dat [m x N]
 // [[Rcpp::export]]
@@ -28,6 +247,9 @@ List rbm_cdk_warm(
     int verbose = 0
 )
 {
+    typedef float Scalar;
+    typedef Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic> Matrix;
+
     const int m = vis_dim;
     const int n = hid_dim;
     const int N = dat.cols();
@@ -38,15 +260,11 @@ List rbm_cdk_warm(
     // Indices of observations
     VectorXi ind = VectorXi::LinSpaced(N, 0, N - 1);
 
-    // Parameters and derivatives
-    VectorXd b = b0, db(m), c = c0, dc(n);
-    MatrixXd w = w0, dw(m, n);
-
     // log-likelihood value
-    std::vector<double> loglik;
+    std::vector<Scalar> loglik;
 
-    // Markov chains
-    MatrixXd v0(m, nchain), vchains(m, nchain), hmeanchains(n, nchain);
+    // RBM model
+    RBM<Scalar> rbm(m, n, nchain, b0, c0, w0);
 
     for(int k = 0; k < niter; k++)
     {
@@ -65,59 +283,33 @@ List rbm_cdk_warm(
 
             // Indices for this mini-batch: i, i+1, ..., i+bs-1
             const int bs = std::min(i + batch_size, N) - i;
+
             // Mini-batch data
-            MatrixXd mb_dat(m, bs);
+            Matrix mb_dat(m, bs);
             for(int j = 0; j < bs; j++)
             {
-                mb_dat.col(j).noalias() = dat.col(ind[i + j]);
+                mb_dat.col(j).noalias() = dat.col(ind[i + j]).cast<Scalar>();
             }
-            // Mean of hidden units given data
-            MatrixXd hmean(n, bs);
-            hmean.noalias() = w.transpose() * mb_dat;
-            hmean.colwise() += c;
-            apply_sigmoid(hmean);
+
+            // First term
+            rbm.compute_grad1(mb_dat);
 
             // Initial values for Gibbs sampler
-            for(int j = 0; j < nchain; j++)
-            {
-                v0.col(j).noalias() = dat.col(int(R::unif_rand() * N));
-            }
+            rbm.init_v0(dat);
 
-            // Run Gibbs sampler
-            RBMSampler<double> sampler(w, b, c);
-            sampler.sample_k_mc(v0, vchains, hmeanchains, ngibbs, nchain);
-            hmeanchains.noalias() = w.transpose() * vchains;
-            hmeanchains.colwise() += c;
-            apply_sigmoid(hmeanchains);
-
-            // Compute gradient
-            db.noalias() = mb_dat.rowwise().mean() - vchains.rowwise().mean();
-            dc.noalias() = hmean.rowwise().mean() - hmeanchains.rowwise().mean();
-            dw.noalias() = (1.0 / bs) * mb_dat * hmean.transpose() -
-                (1.0 / nchain) * vchains * hmeanchains.transpose();
+            // Second term
+            rbm.zero_grad2();
+            rbm.accumulate_grad2_cdk(ngibbs);
 
             // Update parameters
-            b.noalias() += lr * db;
-            c.noalias() += lr * dc;
-            w.noalias() += lr * dw;
+            rbm.update_param(lr, nchain);
 
             // Compute log-likelihood every `neval_mb` mini-batches
             if(batch_id % neval_mb == 0)
             {
                 if(eval_loglik)
                 {
-                    // Get a subset of data
-                    neval_dat = std::min(neval_dat, N);
-                    MatrixXd subdat(m, neval_dat);
-                    for(int s = 0; s < neval_dat; s++)
-                    {
-                        subdat.col(s).noalias() = dat.col(int(R::unif_rand() * N));
-                    }
-
-                    // Compute the loglikelihood value
-                    const double res = exact_loglik ?
-                        (loglik_rbm_exact(m, n, neval_dat, w.data(), b.data(), c.data(), subdat.data())) :
-                        (loglik_rbm_approx(m, n, neval_dat, w.data(), b.data(), c.data(), subdat.data(), neval_mcmc, neval_step));
+                    const Scalar res = rbm.loglik(dat, exact_loglik, neval_dat, neval_mcmc, neval_step);
                     loglik.push_back(res);
                 } else {
                     loglik.push_back(NumericVector::get_na());
@@ -127,9 +319,9 @@ List rbm_cdk_warm(
     }
 
     return List::create(
-        Rcpp::Named("w") = w,
-        Rcpp::Named("b") = b,
-        Rcpp::Named("c") = c,
+        Rcpp::Named("w") = rbm.get_w(),
+        Rcpp::Named("b") = rbm.get_b(),
+        Rcpp::Named("c") = rbm.get_c(),
         Rcpp::Named("loglik") = loglik
     );
 }
@@ -178,6 +370,9 @@ List rbm_pcdk_warm(
         int verbose = 0
 )
 {
+    typedef float Scalar;
+    typedef Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic> Matrix;
+
     const int m = vis_dim;
     const int n = hid_dim;
     const int N = dat.cols();
@@ -188,21 +383,14 @@ List rbm_pcdk_warm(
     // Indices of observations
     VectorXi ind = VectorXi::LinSpaced(N, 0, N - 1);
 
-    // Parameters and derivatives
-    VectorXd b = b0, db(m), c = c0, dc(n);
-    MatrixXd w = w0, dw(m, n);
-
     // log-likelihood value
-    std::vector<double> loglik;
+    std::vector<Scalar> loglik;
 
-    // Markov chains
-    MatrixXd vchains(m, nchain), hmeanchains(n, nchain);
+    // RBM model
+    RBM<Scalar> rbm(m, n, nchain, b0, c0, w0);
 
     // Initial values for Gibbs sampler
-    for(int j = 0; j < nchain; j++)
-    {
-        vchains.col(j).noalias() = dat.col(int(R::unif_rand() * N));
-    }
+    rbm.init_v0(dat);
 
     for(int k = 0; k < niter; k++)
     {
@@ -221,54 +409,30 @@ List rbm_pcdk_warm(
 
             // Indices for this mini-batch: i, i+1, ..., i+bs-1
             const int bs = std::min(i + batch_size, N) - i;
+
             // Mini-batch data
-            MatrixXd mb_dat(m, bs);
+            Matrix mb_dat(m, bs);
             for(int j = 0; j < bs; j++)
             {
-                mb_dat.col(j).noalias() = dat.col(ind[i + j]);
+                mb_dat.col(j).noalias() = dat.col(ind[i + j]).cast<Scalar>();
             }
-            // Mean of hidden units given data
-            MatrixXd hmean(n, bs);
-            hmean.noalias() = w.transpose() * mb_dat;
-            hmean.colwise() += c;
-            apply_sigmoid(hmean);
 
-            // Run Gibbs sampler
-            RBMSampler<double> sampler(w, b, c);
-            // vchains will be updated to the last value in the chain
-            sampler.sample_k_mc(vchains, vchains, hmeanchains, ngibbs, nchain);
-            hmeanchains.noalias() = w.transpose() * vchains;
-            hmeanchains.colwise() += c;
-            apply_sigmoid(hmeanchains);
+            // First term
+            rbm.compute_grad1(mb_dat);
 
-            // Compute gradient
-            db.noalias() = mb_dat.rowwise().mean() - vchains.rowwise().mean();
-            dc.noalias() = hmean.rowwise().mean() - hmeanchains.rowwise().mean();
-            dw.noalias() = (1.0 / bs) * mb_dat * hmean.transpose() -
-                (1.0 / nchain) * vchains * hmeanchains.transpose();
+            // Second term
+            rbm.zero_grad2();
+            rbm.accumulate_grad2_pcdk(ngibbs);
 
             // Update parameters
-            b.noalias() += lr * db;
-            c.noalias() += lr * dc;
-            w.noalias() += lr * dw;
+            rbm.update_param(lr, nchain);
 
             // Compute log-likelihood every `neval_mb` mini-batches
             if(batch_id % neval_mb == 0)
             {
                 if(eval_loglik)
                 {
-                    // Get a subset of data
-                    neval_dat = std::min(neval_dat, N);
-                    MatrixXd subdat(m, neval_dat);
-                    for(int s = 0; s < neval_dat; s++)
-                    {
-                        subdat.col(s).noalias() = dat.col(int(R::unif_rand() * N));
-                    }
-
-                    // Compute the loglikelihood value
-                    const double res = exact_loglik ?
-                    (loglik_rbm_exact(m, n, neval_dat, w.data(), b.data(), c.data(), subdat.data())) :
-                        (loglik_rbm_approx(m, n, neval_dat, w.data(), b.data(), c.data(), subdat.data(), neval_mcmc, neval_step));
+                    const Scalar res = rbm.loglik(dat, exact_loglik, neval_dat, neval_mcmc, neval_step);
                     loglik.push_back(res);
                 } else {
                     loglik.push_back(NumericVector::get_na());
@@ -278,9 +442,9 @@ List rbm_pcdk_warm(
     }
 
     return List::create(
-        Rcpp::Named("w") = w,
-        Rcpp::Named("b") = b,
-        Rcpp::Named("c") = c,
+        Rcpp::Named("w") = rbm.get_w(),
+        Rcpp::Named("b") = rbm.get_b(),
+        Rcpp::Named("c") = rbm.get_c(),
         Rcpp::Named("loglik") = loglik
     );
 }
@@ -317,157 +481,6 @@ List rbm_pcdk(
                         verbose);
 }
 
-
-
-template <typename Scalar = float>
-class RBMUCD
-{
-private:
-    typedef Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic> Matrix;
-    typedef Eigen::Matrix<Scalar, Eigen::Dynamic, 1> Vector;
-    typedef const Eigen::Ref<const Matrix> RefConstMat;
-    typedef const Eigen::Ref<const Vector> RefConstVec;
-
-    const int m_m;
-    const int m_n;
-    const int m_nchain;
-
-    Vector    m_b;
-    Vector    m_c;
-    Matrix    m_w;
-
-    Vector    m_db;
-    Vector    m_dc;
-    Matrix    m_dw;
-
-    Matrix    m_vc0;
-    Matrix    m_hc0;
-
-public:
-    RBMUCD(int m, int n, int nchain) :
-        m_m(m), m_n(n), m_nchain(nchain),
-        m_b(m), m_c(n), m_w(m, n), m_db(m), m_dc(n), m_dw(m, n),
-        m_vc0(m, nchain), m_hc0(n, nchain)
-    {
-        random_normal(m_b.data(), m, Scalar(0), Scalar(0.1));
-        random_normal(m_c.data(), n, Scalar(0), Scalar(0.1));
-        random_normal(m_w.data(), m * n, Scalar(0), Scalar(0.1));
-    }
-
-    template <typename OtherScalar>
-    RBMUCD(int m, int n, int nchain,
-           Eigen::Map< Eigen::Matrix<OtherScalar, Eigen::Dynamic, 1> > b0,
-           Eigen::Map< Eigen::Matrix<OtherScalar, Eigen::Dynamic, 1> > c0,
-           Eigen::Map< Eigen::Matrix<OtherScalar, Eigen::Dynamic, Eigen::Dynamic> > w0) :
-        m_m(m), m_n(n), m_nchain(nchain),
-        m_b(m), m_c(n), m_w(m, n), m_db(m), m_dc(n), m_dw(m, n),
-        m_vc0(m, nchain), m_hc0(n, nchain)
-    {
-        m_b.noalias() = b0.template cast<Scalar>();
-        m_c.noalias() = c0.template cast<Scalar>();
-        m_w.noalias() = w0.template cast<Scalar>();
-    }
-
-    void zero_grad()
-    {
-        m_db.setZero();
-        m_dc.setZero();
-        m_dw.setZero();
-    }
-
-    // Run one Markov chain
-    template <typename Derived>
-    void accumulate_grad_2nd_term(
-        Eigen::MatrixBase<Derived>& dat, int seed, int min_mcmc, int max_mcmc, int verbose, Scalar& tau_t, Scalar& disc_t
-    )
-    {
-        // Sampler
-        std::mt19937 gen(seed);
-        RBMSampler<Scalar> sampler(m_w, m_b, m_c);
-        // Initial value - a random observation
-        std::uniform_int_distribution<> rand_ind(0, dat.cols() - 1);
-        Vector v0 = dat.col(rand_ind(gen)).template cast<Scalar>();
-
-        // MCMC path
-        Vector vk(m_m), hk_mean(m_n);
-        Matrix vhist, vchist;
-
-        // # discarded samples
-        disc_t = sampler.sample(gen, v0, vhist, vchist, min_mcmc, max_mcmc, verbose > 2);
-        const int burnin = min_mcmc - 1;
-        const int remain = vchist.cols() - burnin;
-        // Chain length
-        tau_t += vchist.cols();
-
-        vk.noalias() = vhist.col(burnin);
-        hk_mean.noalias() = m_w.transpose() * vk + m_c;
-        apply_sigmoid(hk_mean);
-
-        Matrix hhist_mean = m_w.transpose() * vhist.rightCols(remain);
-        hhist_mean.colwise() += m_c;
-        apply_sigmoid(hhist_mean);
-
-        Matrix hchist_mean = m_w.transpose() * vchist.rightCols(remain);
-        hchist_mean.colwise() += m_c;
-        apply_sigmoid(hchist_mean);
-
-        // Compute the second term of gradient
-        Vector db_t = Vector::Zero(m_m), dc_t = Vector::Zero(m_n);
-        Matrix dw_t = Matrix::Zero(m_m, m_n);
-
-        db_t.noalias() = vk + vhist.rightCols(remain).rowwise().sum() -
-                              vchist.rightCols(remain).rowwise().sum();
-        dc_t.noalias() = hk_mean + hhist_mean.rowwise().sum() -
-                                   hchist_mean.rowwise().sum();
-        dw_t.noalias() = vk * hk_mean.transpose() +
-            vhist.rightCols(remain) * hhist_mean.transpose() -
-            vchist.rightCols(remain) * hchist_mean.transpose();
-
-        // Accumulate gradients
-        #pragma omp critical
-        {
-            m_db.noalias() += db_t;
-            m_dc.noalias() += dc_t;
-            m_dw.noalias() += dw_t;
-        }
-    }
-
-    // Add first term of gradients
-    void compute_grad(RefConstMat& v)
-    {
-        const int bs = v.cols();
-
-        // Mean of hidden units given data
-        Matrix hmean(m_n, bs);
-        hmean.noalias() = m_w.transpose() * v;
-        hmean.colwise() += m_c;
-        apply_sigmoid(hmean);
-
-        m_db.noalias() = v.rowwise().mean() - m_db / Scalar(m_nchain);
-        m_dc.noalias() = hmean.rowwise().mean() - m_dc / Scalar(m_nchain);
-        m_dw.noalias() = (1.0 / bs) * v * hmean.transpose() - m_dw / Scalar(m_nchain);
-    }
-
-    void update_param(Scalar lr)
-    {
-        m_b.noalias() += lr * m_db;
-        m_c.noalias() += lr * m_dc;
-        m_w.noalias() += lr * m_dw;
-    }
-
-    Scalar loglikelihood(RefConstMat dat, bool exact, int nsamp, int nstep) const
-    {
-        return exact ?
-            (loglik_rbm_exact(m_m, m_n, dat.cols(), m_w.data(), m_b.data(), m_c.data(), dat.data())) :
-            (loglik_rbm_approx(m_m, m_n, dat.cols(), m_w.data(), m_b.data(), m_c.data(), dat.data(), nsamp, nstep));
-    }
-
-    const Matrix& get_w() const { return m_w; }
-    const Vector& get_b() const { return m_b; }
-    const Vector& get_c() const { return m_c; }
-};
-
-
 // dat [m x N]
 // [[Rcpp::export]]
 List rbm_fit_warm(
@@ -482,7 +495,6 @@ List rbm_fit_warm(
 {
     typedef float Scalar;
     typedef Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic> Matrix;
-    typedef Eigen::Matrix<Scalar, Eigen::Dynamic, 1> Vector;
 
     const int m = vis_dim;
     const int n = hid_dim;
@@ -495,8 +507,7 @@ List rbm_fit_warm(
     VectorXi ind = VectorXi::LinSpaced(N, 0, N - 1);
 
     // RBM model
-    RBMUCD<Scalar> rbm(m, n, nchain, b0, c0, w0);
-    // rbm.init_vh(dat.leftCols(nchain).cast<Scalar>());
+    RBM<Scalar> rbm(m, n, nchain, b0, c0, w0);
 
     // log-likelihood value
     std::vector<Scalar> loglik;
@@ -538,42 +549,37 @@ List rbm_fit_warm(
                 mb_dat.col(j).noalias() = dat.col(ind[i + j]).cast<Scalar>();
             }
 
+            // First term
+            rbm.compute_grad1(mb_dat);
+
             // Random seeds for parallel computing
             Rcpp::IntegerVector seeds = Rcpp::sample(100000, nchain);
 
-            // Initialize gradients
-            rbm.zero_grad();
+            // Initial values for Gibbs sampler
+            rbm.init_v0(dat);
 
-            // Compute the second term of gradient
-            #pragma omp parallel for shared(seeds, rbm, dat) reduction(+:tau_sum, disc_sum) schedule(dynamic)
+            // Second term
+            rbm.zero_grad2();
+            #pragma omp parallel for shared(seeds, rbm) reduction(+:tau_sum, disc_sum) schedule(dynamic)
             for(int j = 0; j < nchain; j++)
             {
                 Scalar tau_t = 0.0, disc_t = 0.0;
-                rbm.accumulate_grad_2nd_term(dat, seeds[j], min_mcmc, max_mcmc, verbose, tau_t, disc_t);
+                rbm.accumulate_grad2_ucd(j, seeds[j], min_mcmc, max_mcmc, verbose, tau_t, disc_t);
 
                 tau_sum += tau_t;
                 disc_sum += disc_t;
             }
 
             // Update parameters
-            rbm.compute_grad(mb_dat);
-            rbm.update_param(lr);
+            rbm.update_param(lr, nchain);
 
             // Compute log-likelihood every `neval_mb` mini-batches
             if(batch_id % neval_mb == 0)
             {
                 if(eval_loglik)
                 {
-                    // Get a subset of data
-                    neval_dat = std::min(neval_dat, N);
-                    Matrix subdat(m, neval_dat);
-                    for(int s = 0; s < neval_dat; s++)
-                    {
-                        subdat.col(s).noalias() = dat.col(int(R::unif_rand() * N)).cast<Scalar>();
-                    }
-
-                    // Compute the loglikelihood value
-                    loglik.push_back(rbm.loglikelihood(subdat, exact_loglik, neval_mcmc, neval_step));
+                    const Scalar res = rbm.loglik(dat, exact_loglik, neval_dat, neval_mcmc, neval_step);
+                    loglik.push_back(res);
                 } else {
                     loglik.push_back(NumericVector::get_na());
                 }
