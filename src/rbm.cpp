@@ -28,9 +28,7 @@ private:
     Vector    m_dc2;
     Matrix    m_dw2;
 
-    Matrix    m_vc0;
-    Matrix    m_hc0;
-
+    Matrix    m_v0;
     Matrix    m_vchains;
     Matrix    m_hchains;
 
@@ -39,7 +37,7 @@ public:
         m_m(m), m_n(n), m_nchain(nchain),
         m_b(m), m_c(n), m_w(m, n),
         m_db1(m), m_dc1(n), m_dw1(m, n), m_db2(m), m_dc2(n), m_dw2(m, n),
-        m_vc0(m, nchain), m_hc0(n, nchain), m_vchains(m, nchain), m_hchains(n, nchain)
+        m_v0(m, nchain), m_vchains(m, nchain), m_hchains(n, nchain)
     {
         random_normal(m_b.data(), m, Scalar(0), Scalar(0.1));
         random_normal(m_c.data(), n, Scalar(0), Scalar(0.1));
@@ -54,7 +52,7 @@ public:
         m_m(m), m_n(n), m_nchain(nchain),
         m_b(m), m_c(n), m_w(m, n),
         m_db1(m), m_dc1(n), m_dw1(m, n), m_db2(m), m_dc2(n), m_dw2(m, n),
-        m_vc0(m, nchain), m_hc0(n, nchain), m_vchains(m, nchain), m_hchains(n, nchain)
+        m_v0(m, nchain), m_vchains(m, nchain), m_hchains(n, nchain)
     {
         m_b.noalias() = b0.template cast<Scalar>();
         m_c.noalias() = c0.template cast<Scalar>();
@@ -119,7 +117,7 @@ public:
         const int N = dat.cols();
         for(int i = 0; i < m_nchain; i++)
         {
-            m_vc0.col(i).noalias() = dat.col(int(R::unif_rand() * N)).template cast<Scalar>();
+            m_v0.col(i).noalias() = dat.col(int(R::unif_rand() * N)).template cast<Scalar>();
         }
     }
 
@@ -128,7 +126,7 @@ public:
     {
         // Gibbs samples
         RBMSampler<Scalar> sampler(m_w, m_b, m_c);
-        sampler.sample_k_mc(m_vc0, m_vchains, m_hchains, k, m_nchain);
+        sampler.sample_k_mc(m_v0, m_vchains, m_hchains, k, m_nchain);
 
         // Second term of gradient
         m_hchains.noalias() = m_w.transpose() * m_vchains;
@@ -145,7 +143,7 @@ public:
     {
         // Gibbs samples
         RBMSampler<Scalar> sampler(m_w, m_b, m_c);
-        Matrix& vchains = m_vc0;
+        Matrix& vchains = m_v0;
         // vchains will be updated to the last state of the Markov chain
         sampler.sample_k_mc(vchains, vchains, m_hchains, k, m_nchain);
 
@@ -171,7 +169,7 @@ public:
         Matrix vhist, vchist;
 
         // # discarded samples
-        disc_t = sampler.sample(gen, m_vc0.col(id), vhist, vchist, min_mcmc, max_mcmc, verbose > 2);
+        disc_t = sampler.sample(gen, m_v0.col(id), vhist, vchist, min_mcmc, max_mcmc, verbose > 2);
         const int burnin = min_mcmc - 1;
         const int remain = vchist.cols() - burnin;
         // Chain length
