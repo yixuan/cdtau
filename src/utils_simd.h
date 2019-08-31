@@ -4,7 +4,7 @@
 #include <RcppEigen.h>
 #include <xsimd/xsimd.hpp>
 
-// log(1 + exp(x1)) + ... + log(1 + exp(xn))
+// log(1 + exp(x1)), ..., log(1 + exp(xn))
 template <typename Derived>
 void apply_log1exp_simd(Eigen::MatrixBase<Derived>& x)
 {
