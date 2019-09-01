@@ -49,14 +49,12 @@ Scalar loglik_rbm_exact(
     const Scalar logz = log_sum_exp(logzv);
 
     // https://arxiv.org/pdf/1510.02255.pdf, Eqn. (4)
-    Vector loglik(N);
-    Vector term1 = dat.transpose() * b;
+    Scalar term1 = dat.rowwise().sum().dot(b);
     Matrix term2 = w.transpose() * dat;
     term2.colwise() += c;
     apply_log1exp_simd(term2);
-    loglik.noalias() = term1 + term2.colwise().sum().transpose();
 
-    return loglik.sum() - logz * N;
+    return term1 + term2.sum() - logz * N;
 }
 
 template <typename Scalar>
