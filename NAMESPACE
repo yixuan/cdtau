@@ -1,3 +1,6 @@
-exportPattern("^[[:alpha:]]+")
 importFrom(Rcpp, evalCpp)
 useDynLib(cdtau, .registration = TRUE)
+
+export(loglik_rbm, loglik_rbm_approx)
+export(rbm_sample_k, rbm_sample_tau)
+export(rbm_cdk, rbm_ucd)

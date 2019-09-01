@@ -15,13 +15,13 @@ typedef Eigen::Map<MatrixXd> MapMat;
 
 // dat [m x N]
 // [[Rcpp::export]]
-List rbm_cdk_warm(
+List rbm_cdk_warm_(
     int vis_dim, int hid_dim, MapMat dat,
     MapVec b0, MapVec c0, MapMat w0,
     int batch_size = 10, double lr = 0.1, int niter = 100,
     int ngibbs = 10, int nchain = 1, bool persistent = false,
-    bool eval_loglik = false, bool exact_loglik = true,
-    int neval_mb = 10, int neval_dat = 1000, int neval_mcmc = 100, int neval_step = 10,
+    bool eval_loglik = false, bool exact_loglik = false,
+    int eval_freq = 10, int eval_size = 100, int eval_nmc = 100, int eval_nstep = 10,
     int verbose = 0
 )
 {
@@ -89,12 +89,12 @@ List rbm_cdk_warm(
             // Update parameters
             rbm.update_param(lr, nchain);
 
-            // Compute log-likelihood every `neval_mb` mini-batches
-            if(batch_id % neval_mb == 0)
+            // Compute log-likelihood every `eval_freq` mini-batches
+            if(batch_id % eval_freq == 0)
             {
                 if(eval_loglik)
                 {
-                    const Scalar res = rbm.loglik(dat, exact_loglik, neval_dat, neval_mcmc, neval_step);
+                    const Scalar res = rbm.loglik(dat, exact_loglik, eval_size, eval_nmc, eval_nstep);
                     loglik.push_back(res);
                 } else {
                     loglik.push_back(NumericVector::get_na());
@@ -112,12 +112,12 @@ List rbm_cdk_warm(
 }
 
 // [[Rcpp::export]]
-List rbm_cdk(
+List rbm_cdk_(
     int vis_dim, int hid_dim, MapMat dat,
     int batch_size = 10, double lr = 0.1, int niter = 100,
     int ngibbs = 10, int nchain = 1, bool persistent = false,
-    bool eval_loglik = false, bool exact_loglik = true,
-    int neval_mb = 10, int neval_dat = 1000, int neval_mcmc = 100, int neval_step = 10,
+    bool eval_loglik = false, bool exact_loglik = false,
+    int eval_freq = 10, int eval_size = 100, int eval_nmc = 100, int eval_nstep = 10,
     int verbose = 0
 )
 {
@@ -136,22 +136,22 @@ List rbm_cdk(
     random_normal(c.data(), n, 0.0, 0.1);
     random_normal(w.data(), m * n, 0.0, 0.1);
 
-    return rbm_cdk_warm(vis_dim, hid_dim, dat, b, c, w,
-                        batch_size, lr, niter, ngibbs, nchain, persistent,
-                        eval_loglik, exact_loglik,
-                        neval_mb, neval_dat, neval_mcmc, neval_step,
-                        verbose);
+    return rbm_cdk_warm_(vis_dim, hid_dim, dat, b, c, w,
+                         batch_size, lr, niter, ngibbs, nchain, persistent,
+                         eval_loglik, exact_loglik,
+                         eval_freq, eval_size, eval_nmc, eval_nstep,
+                         verbose);
 }
 
 // dat [m x N]
 // [[Rcpp::export]]
-List rbm_fit_warm(
+List rbm_ucd_warm_(
     int vis_dim, int hid_dim, MapMat dat,
     MapVec b0, MapVec c0, MapMat w0,
     int batch_size = 10, double lr = 0.1, int niter = 100,
     int min_mcmc = 1, int max_mcmc = 100, int nchain = 1,
     bool eval_loglik = false, bool exact_loglik = false,
-    int neval_mb = 10, int neval_dat = 1000, int neval_mcmc = 100, int neval_step = 10,
+    int eval_freq = 10, int eval_size = 100, int eval_nmc = 100, int eval_nstep = 10,
     int verbose = 0
 )
 {
@@ -235,23 +235,23 @@ List rbm_fit_warm(
             // Update parameters
             rbm.update_param(lr, nchain);
 
-            // Compute log-likelihood every `neval_mb` mini-batches
-            if(batch_id % neval_mb == 0)
+            // Compute log-likelihood every `eval_freq` mini-batches
+            if(batch_id % eval_freq == 0)
             {
                 if(eval_loglik)
                 {
-                    const Scalar res = rbm.loglik(dat, exact_loglik, neval_dat, neval_mcmc, neval_step);
+                    const Scalar res = rbm.loglik(dat, exact_loglik, eval_size, eval_nmc, eval_nstep);
                     loglik.push_back(res);
                 } else {
                     loglik.push_back(NumericVector::get_na());
                 }
 
                 // Compute average number of discarded samples in coupling
-                disc.push_back(disc_sum / Scalar(neval_mb * nchain));
+                disc.push_back(disc_sum / Scalar(eval_freq * nchain));
                 disc_sum = 0.0;
 
                 // Compute average chain length and reset taui
-                tau.push_back(tau_sum / Scalar(neval_mb * nchain));
+                tau.push_back(tau_sum / Scalar(eval_freq * nchain));
                 tau_sum = 0.0;
             }
         }
@@ -268,12 +268,12 @@ List rbm_fit_warm(
 }
 
 // [[Rcpp::export]]
-List rbm_fit(
+List rbm_ucd_(
     int vis_dim, int hid_dim, MapMat dat,
     int batch_size = 10, double lr = 0.1, int niter = 100,
     int min_mcmc = 1, int max_mcmc = 100, int nchain = 1,
     bool eval_loglik = false, bool exact_loglik = false,
-    int neval_mb = 10, int neval_dat = 1000, int neval_mcmc = 100, int neval_step = 10,
+    int eval_freq = 10, int eval_size = 100, int eval_nmc = 100, int eval_nstep = 10,
     int verbose = 0
 )
 {
@@ -292,10 +292,10 @@ List rbm_fit(
     random_normal(c.data(), n, 0.0, 0.1);
     random_normal(w.data(), m * n, 0.0, 0.1);
 
-    return rbm_fit_warm(vis_dim, hid_dim, dat, b, c, w,
-                        batch_size, lr, niter,
-                        min_mcmc, max_mcmc, nchain,
-                        eval_loglik, exact_loglik,
-                        neval_mb, neval_dat, neval_mcmc, neval_step,
-                        verbose);
+    return rbm_ucd_warm_(vis_dim, hid_dim, dat, b, c, w,
+                         batch_size, lr, niter,
+                         min_mcmc, max_mcmc, nchain,
+                         eval_loglik, exact_loglik,
+                         eval_freq, eval_size, eval_nmc, eval_nstep,
+                         verbose);
 }
