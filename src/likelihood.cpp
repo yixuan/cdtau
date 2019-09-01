@@ -6,7 +6,39 @@ using Eigen::MatrixXd;
 typedef Eigen::Map<VectorXd> MapVec;
 typedef Eigen::Map<MatrixXd> MapMat;
 
-// w[m x n], b[m x 1], c[n x 1], dat[m x N]
+//' Compute Log-likelihood Value for RBM
+//'
+//' The two functions compute the exact and approximate log-likelihood values for RBM, respectively.
+//'
+//' @param w       Weight parameter of the RBM, of size \code{[m x n]}.
+//' @param b       Bias parameter for the visible units, of size \code{[m x 1]}.
+//' @param c       Bias parameter for the hidden units, of size \code{[n x 1]}.
+//' @param dat     The observed data, of size \code{[m x N]}.
+//' @param nsamp   Size of the Monte Carlo sample for approximation.
+//' @param nstep   Number of steps in the Gibbs sampler.
+//'
+//' @examples
+//' set.seed(123)
+//' m = 10
+//' n = 10
+//' b = rnorm(m, sd = 0.1)
+//' c = rnorm(n, sd = 0.1)
+//' w = matrix(rnorm(m * n, sd = 1.0), m, n)
+//'
+//' N = 100
+//' dat = matrix(0, m, N)
+//' v0 = rbinom(m, 1, 0.5)
+//' for(i in 1:N)
+//' {
+//'     dat[, i] = rbm_sample_k(w, b, c, v0, k = 100)$v
+//' }
+//'
+//' loglik_rbm(w, b, c, dat)
+//' loglik_rbm_approx(w, b, c, dat, nsamp = 100, nstep = 10)
+//' loglik_rbm_approx(w, b, c, dat, nsamp = 100, nstep = 100)
+//'
+//' @rdname loglik_rbm
+//'
 // [[Rcpp::export]]
 double loglik_rbm(MapMat w, MapVec b, MapVec c, MapMat dat)
 {
@@ -21,6 +53,7 @@ double loglik_rbm(MapMat w, MapVec b, MapVec c, MapMat dat)
     return loglik_rbm_exact(m, n, N, w.data(), b.data(), c.data(), dat.data());
 }
 
+//' @rdname loglik_rbm
 // [[Rcpp::export]]
 double loglik_rbm_approx(MapMat w, MapVec b, MapVec c, MapMat dat,
                          int nsamp = 100, int nstep = 10)
@@ -57,4 +90,4 @@ double loglik_rbm_approx(MapMat w, MapVec b, MapVec c, MapMat dat,
  loglik_rbm_approx(w, b, c, dat, nsamp = 100, nstep = 10)
  loglik_rbm_approx(w, b, c, dat, nsamp = 100, nstep = 100)
 
- */
+*/

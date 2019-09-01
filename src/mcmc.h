@@ -107,7 +107,7 @@ public:
     }
 
     // Sample k steps
-    void sample_k(const Vector& v0, Vector& v, Vector& h, int k = 10) const
+    void sample_k(RefConstVec& v0, Vector& v, Vector& h, int k = 10) const
     {
         v.resize(m_m);
         h.resize(m_n);
@@ -252,7 +252,7 @@ public:
 
     int sample(
         std::mt19937& gen,
-        const Vector& v0, Matrix& vhist, Matrix& vchist,
+        RefConstVec& v0, Matrix& vhist, Matrix& vchist,
         int min_steps = 1, int max_steps = 100, bool verbose = false
     ) const
     {
