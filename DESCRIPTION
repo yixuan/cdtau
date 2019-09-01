@@ -1,12 +1,12 @@
 Package: cdtau
 Type: Package
-Title: What the Package Does (Title Case)
+Title: Unbiased Contrastive Divergence Algorithm
 Version: 0.1.0
-Author: Who wrote it
-Maintainer: The package maintainer <yourself@somewhere.net>
-Description: More about what it does (maybe more than one line)
-    Use four spaces when indenting paragraphs within the Description.
-License: What license is it under?
+Author: Yixuan Qiu, Lingsong Zhang, and Xiao Wang
+Maintainer: Yixuan Qiu <yixuan.qiu@cos.name>
+Description: Unbiased contrastive divergence algorithm for training energy-based
+    latent variable models.
+License: MPL (>=2)
 Encoding: UTF-8
 LazyData: true
 Imports: Rcpp (>= 1.0.1)
