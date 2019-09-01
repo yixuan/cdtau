@@ -27,7 +27,7 @@ Scalar log1exp(const Scalar& x)
     return std::log(Scalar(1) + std::exp(-std::abs(x))) + std::max(x, Scalar(0));
 }
 
-// log(1 + exp(x1)) + ... + log(1 + exp(xn))
+// log(1 + exp(x1)), ..., log(1 + exp(xn))
 template <typename Derived>
 void apply_log1exp(Eigen::MatrixBase<Derived>& x)
 {
