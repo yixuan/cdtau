@@ -95,5 +95,5 @@ Scalar loglik_rbm_approx(
     return loglik - N * std::log(Scalar(nsamp));
 }
 
-#endif  // CDTAU_LIKELIHOOD_H
 
+#endif  // CDTAU_LIKELIHOOD_H

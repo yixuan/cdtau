@@ -281,4 +281,3 @@ public:
 
 
 #endif  // CDTAU_MCMC_H
-
