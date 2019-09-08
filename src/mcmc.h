@@ -34,13 +34,15 @@ private:
         // p1(v | h1)
         Vector v2mean = m_w * h1 + m_b;
         apply_sigmoid(v2mean);
-        random_bernoulli(v2mean, v2, gen);
+        Vector uv(m_m);
+        random_uniform(uv, gen);
+        random_bernoulli_uvar(v2mean, uv, v2);
         // p2(h | v)
         Vector h2mean = m_w.transpose() * v2 + m_c;
         apply_sigmoid(h2mean);
-        Vector uvar(m_n);
-        random_uniform(uvar, gen);
-        random_bernoulli_uvar(h2mean, uvar, h2);
+        Vector uh(m_n);
+        random_uniform(uh, gen);
+        random_bernoulli_uvar(h2mean, uh, h2);
 
         // If xi1 == eta0, also make xi2 == eta1 and early exit
         if(all_equal(v1, vc0) && all_equal(h1, hc0))
@@ -74,7 +76,10 @@ private:
         // Otherwise, sample the second chain
         for(int i = 0; i < max_try; i++)
         {
-            random_bernoulli(vc1mean, vc1, gen);
+            if(i == 0)
+                random_bernoulli_uvar(vc1mean, uv, vc1);
+            else
+                random_bernoulli(vc1mean, vc1, gen);
             logpxi1 = loglik_bernoulli_simd(v2mean, vc1);
             logpeta0 = loglik_bernoulli_simd(vc1mean, vc1);
             u = exp_distr(gen);
@@ -85,13 +90,13 @@ private:
 
                 Vector hc1mean = m_w.transpose() * vc1 + m_c;
                 apply_sigmoid(hc1mean);
-                random_bernoulli_uvar(hc1mean, uvar, hc1);
+                random_bernoulli_uvar(hc1mean, uh, hc1);
                 return i;
             }
         }
         Vector hc1mean = m_w.transpose() * vc1 + m_c;
         apply_sigmoid(hc1mean);
-        random_bernoulli_uvar(hc1mean, uvar, hc1);
+        random_bernoulli_uvar(hc1mean, uh, hc1);
 
         if(verbose)
             Rcpp::Rcout << "[ maxcoup ]: max" << std::endl;
