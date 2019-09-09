@@ -72,19 +72,25 @@ Scalar loglik_rbm_approx(
     MapMat w(wp, m, n), dat(datp, m, N);
     MapVec b(bp, m), c(cp, n);
 
-    RBMSampler<Scalar> sampler(w, b, c);
-    Vector v0(m), logp(nsamp);
-    Matrix vmean(m, nsamp), h(n, nsamp);
     Scalar loglik = 0.0;
 
+    // Random seeds for C++ RNG
+    Rcpp::IntegerVector seeds = Rcpp::sample(100000, N, true);
+
+    #pragma omp parallel for shared(seeds, dat, w, b, c, m, n, N, nsamp, nstep) reduction(+:loglik) schedule(dynamic)
     for(int i = 0; i < N; i++)
     {
-        v0.noalias() = dat.col(i);
-        sampler.sample_k_mc(v0, vmean, h, nstep, nsamp);
+        RBMSampler<Scalar> sampler(w, b, c);
+        std::mt19937 gen(seeds[i]);
+
+        Vector v0 = dat.col(i);
+        Matrix vmean(m, nsamp), h(n, nsamp);
+        sampler.sample_k_mc(gen, v0, vmean, h, nstep, nsamp);
         vmean.noalias() = w * h;
         vmean.colwise() += b;
         apply_sigmoid(vmean);
 
+        Vector logp(nsamp);
         for(int j = 0; j < nsamp; j++)
         {
             logp[j] = loglik_bernoulli(&vmean(0, j), &dat.coeffRef(0, i), m);

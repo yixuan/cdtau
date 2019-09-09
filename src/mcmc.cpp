@@ -41,8 +41,9 @@ List rbm_sample_k(MapMat w, MapVec b, MapVec c, NumericVector v0, int k = 10)
 {
     RBMSampler<double> sampler(w, b, c);
     VectorXd v, h;
+    std::mt19937 gen(int(R::unif_rand() * 10000));
 
-    sampler.sample_k(Rcpp::as<MapVec>(v0), v, h, k);
+    sampler.sample_k(gen, Rcpp::as<MapVec>(v0), v, h, k);
     return List::create(
         Rcpp::Named("v") = v,
         Rcpp::Named("h") = h

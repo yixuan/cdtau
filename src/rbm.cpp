@@ -215,7 +215,7 @@ List rbm_ucd_warm_(
             rbm.compute_grad1(mb_dat);
 
             // Random seeds for parallel computing
-            Rcpp::IntegerVector seeds = Rcpp::sample(100000, nchain);
+            Rcpp::IntegerVector seeds = Rcpp::sample(100000, nchain, true);
 
             // Initial values for Gibbs sampler
             rbm.init_v0(dat);

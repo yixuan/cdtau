@@ -112,30 +112,30 @@ public:
     }
 
     // Sample k steps
-    void sample_k(RefConstVec& v0, Vector& v, Vector& h, int k = 10) const
+    void sample_k(std::mt19937& gen, RefConstVec& v0, Vector& v, Vector& h, int k = 10) const
     {
         v.resize(m_m);
         h.resize(m_n);
 
         Vector hmean = m_w.transpose() * v0 + m_c;
         apply_sigmoid(hmean);
-        random_bernoulli(hmean, h);
+        random_bernoulli(hmean, h, gen);
 
         Vector vmean(m_m);
         for(int i = 0; i < k; i++)
         {
             vmean.noalias() = m_w * h + m_b;
             apply_sigmoid(vmean);
-            random_bernoulli(vmean, v);
+            random_bernoulli(vmean, v, gen);
 
             hmean.noalias() = m_w.transpose() * v + m_c;
             apply_sigmoid(hmean);
-            random_bernoulli(hmean, h);
+            random_bernoulli(hmean, h, gen);
         }
     }
 
     // Sample k steps on multiple chains, using multiple initial values
-    void sample_k_mc(const Matrix& v0, Matrix& v, Matrix& h, int k = 10) const
+    void sample_k_mc(std::mt19937& gen, const Matrix& v0, Matrix& v, Matrix& h, int k = 10) const
     {
         const int nchain = v0.cols();
         v.resize(m_m, nchain);
@@ -144,24 +144,24 @@ public:
         h.noalias() = m_w.transpose() * v0;
         h.colwise() += m_c;
         apply_sigmoid(h);
-        random_bernoulli(h, h);
+        random_bernoulli(h, h, gen);
 
         for(int i = 0; i < k; i++)
         {
             v.noalias() = m_w * h;
             v.colwise() += m_b;
             apply_sigmoid(v);
-            random_bernoulli(v, v);
+            random_bernoulli(v, v, gen);
 
             h.noalias() = m_w.transpose() * v;
             h.colwise() += m_c;
             apply_sigmoid(h);
-            random_bernoulli(h, h);
+            random_bernoulli(h, h, gen);
         }
     }
 
     // Sample k steps on multiple chains, using the same initial vector
-    void sample_k_mc(const Vector& v0, Matrix& v, Matrix& h, int k = 10, int nchain = 10) const
+    void sample_k_mc(std::mt19937& gen, const Vector& v0, Matrix& v, Matrix& h, int k = 10, int nchain = 10) const
     {
         v.resize(m_m, nchain);
         h.resize(m_n, nchain);
@@ -169,19 +169,19 @@ public:
         h.noalias() = m_w.transpose() * v0.replicate(1, nchain);
         h.colwise() += m_c;
         apply_sigmoid(h);
-        random_bernoulli(h, h);
+        random_bernoulli(h, h, gen);
 
         for(int i = 0; i < k; i++)
         {
             v.noalias() = m_w * h;
             v.colwise() += m_b;
             apply_sigmoid(v);
-            random_bernoulli(v, v);
+            random_bernoulli(v, v, gen);
 
             h.noalias() = m_w.transpose() * v;
             h.colwise() += m_c;
             apply_sigmoid(h);
-            random_bernoulli(h, h);
+            random_bernoulli(h, h, gen);
         }
     }
 
