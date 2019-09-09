@@ -134,6 +134,32 @@ public:
         }
     }
 
+    // Sample k steps on multiple chains, using multiple initial values
+    void sample_k_mc(const Matrix& v0, Matrix& v, Matrix& h, int k = 10) const
+    {
+        const int nchain = v0.cols();
+        v.resize(m_m, nchain);
+        h.resize(m_n, nchain);
+
+        h.noalias() = m_w.transpose() * v0;
+        h.colwise() += m_c;
+        apply_sigmoid(h);
+        random_bernoulli(h, h);
+
+        for(int i = 0; i < k; i++)
+        {
+            v.noalias() = m_w * h;
+            v.colwise() += m_b;
+            apply_sigmoid(v);
+            random_bernoulli(v, v);
+
+            h.noalias() = m_w.transpose() * v;
+            h.colwise() += m_c;
+            apply_sigmoid(h);
+            random_bernoulli(h, h);
+        }
+    }
+
     // Sample k steps on multiple chains, using the same initial vector
     void sample_k_mc(const Vector& v0, Matrix& v, Matrix& h, int k = 10, int nchain = 10) const
     {
@@ -159,32 +185,8 @@ public:
         }
     }
 
-    // Sample k steps on multiple chains, using multiple initial values
-    void sample_k_mc(const Matrix& v0, Matrix& v, Matrix& h, int k = 10, int nchain = 10) const
-    {
-        v.resize(m_m, nchain);
-        h.resize(m_n, nchain);
-
-        h.noalias() = m_w.transpose() * v0;
-        h.colwise() += m_c;
-        apply_sigmoid(h);
-        random_bernoulli(h, h);
-
-        for(int i = 0; i < k; i++)
-        {
-            v.noalias() = m_w * h;
-            v.colwise() += m_b;
-            apply_sigmoid(v);
-            random_bernoulli(v, v);
-
-            h.noalias() = m_w.transpose() * v;
-            h.colwise() += m_c;
-            apply_sigmoid(h);
-            random_bernoulli(h, h);
-        }
-    }
-
     // Unbiased sampling
+    // vc0, hc0, v1, and h1 will be updated
     int sample(
         std::mt19937& gen,
         RefVec vc0, RefVec hc0, RefVec v1, RefVec h1,

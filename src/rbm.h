@@ -129,7 +129,7 @@ public:
     {
         // Gibbs samples
         RBMSampler<Scalar> sampler(m_w, m_b, m_c);
-        sampler.sample_k_mc(m_v0, m_vchains, m_hchains, k, m_nchain);
+        sampler.sample_k_mc(m_v0, m_vchains, m_hchains, k);
 
         // Second term of gradient
         m_hchains.noalias() = m_w.transpose() * m_vchains;
@@ -148,7 +148,7 @@ public:
         RBMSampler<Scalar> sampler(m_w, m_b, m_c);
         Matrix& vchains = m_v0;
         // vchains will be updated to the last state of the Markov chain
-        sampler.sample_k_mc(vchains, vchains, m_hchains, k, m_nchain);
+        sampler.sample_k_mc(vchains, vchains, m_hchains, k);
 
         // Second term of gradient
         m_hchains.noalias() = m_w.transpose() * vchains;
