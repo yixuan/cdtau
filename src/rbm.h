@@ -171,10 +171,11 @@ public:
 
         // MCMC path
         Vector vk(m_m), hk_mean(m_n);
-        Matrix vhist, vchist;
+        Matrix vhist, vchist, hhist, hchist;
 
         // # discarded samples
-        disc_t = sampler.sample(gen, m_v0.col(id), vhist, vchist, min_mcmc, max_mcmc, verbose > 2);
+        disc_t = sampler.sample(gen, m_v0.col(id), vhist, vchist, hhist, hchist,
+                                min_mcmc, max_mcmc, verbose > 2);
         const int burnin = min_mcmc - 1;
         const int remain = vchist.cols() - burnin;
         // Chain length

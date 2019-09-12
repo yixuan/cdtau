@@ -58,13 +58,16 @@ List rbm_sample_tau(
 )
 {
     RBMSampler<double> sampler(w, b, c);
-    MatrixXd vhist, vchist;
+    MatrixXd vhist, vchist, hhist, hchist;
     std::mt19937 gen(int(R::unif_rand() * 10000));
 
-    sampler.sample(gen, Rcpp::as<MapVec>(v0), vhist, vchist, min_steps, max_steps, verbose);
+    sampler.sample(gen, Rcpp::as<MapVec>(v0), vhist, vchist, hhist, hchist,
+                   min_steps, max_steps, verbose);
     return List::create(
         Rcpp::Named("v") = vhist,
-        Rcpp::Named("vc") = vchist
+        Rcpp::Named("vc") = vchist,
+        Rcpp::Named("h") = hhist,
+        Rcpp::Named("hc") = hchist
     );
 }
 

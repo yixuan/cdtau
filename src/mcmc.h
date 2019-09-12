@@ -190,7 +190,7 @@ public:
     int sample(
         std::mt19937& gen,
         RefVec vc0, RefVec hc0, RefVec v1, RefVec h1,
-        Matrix& vhist, Matrix& vchist,
+        Matrix& vhist, Matrix& vchist, Matrix& hhist, Matrix& hchist,
         int min_steps = 1, int max_steps = 100, bool verbose = false
     ) const
     {
@@ -211,6 +211,10 @@ public:
         vs.push_back(v);
         std::vector<Vector> vcs;
 
+        std::vector<Vector> hs;
+        hs.push_back(h);
+        std::vector<Vector> hcs;
+
         int discard = 0;
 
         for(int i = 0; i < max_steps; i++)
@@ -222,6 +226,8 @@ public:
 
             vs.push_back(v_next);
             vcs.push_back(vc_next);
+            hs.push_back(h_next);
+            hcs.push_back(hc_next);
 
             if((i >= min_steps - 1) &&
                (all_equal(v_next, vc_next)) &&
@@ -247,19 +253,24 @@ public:
         const int tau = vcs.size();
         vhist.resize(m_m, tau + 1);
         vchist.resize(m_m, tau);
+        hhist.resize(m_n, tau + 1);
+        hchist.resize(m_n, tau);
         for(int i = 0; i < tau; i++)
         {
             vhist.col(i).noalias() = vs[i];
             vchist.col(i).noalias() = vcs[i];
+            hhist.col(i).noalias() = hs[i];
+            hchist.col(i).noalias() = hcs[i];
         }
         vhist.col(tau).noalias() = vs[tau];
+        hhist.col(tau).noalias() = hs[tau];
 
         return discard;
     }
 
     int sample(
         std::mt19937& gen,
-        RefConstVec& v0, Matrix& vhist, Matrix& vchist,
+        RefConstVec& v0, Matrix& vhist, Matrix& vchist, Matrix& hhist, Matrix& hchist,
         int min_steps = 1, int max_steps = 100, bool verbose = false
     ) const
     {
@@ -282,7 +293,7 @@ public:
         apply_sigmoid(h);
         random_bernoulli(h, h, gen);    // h1
 
-        return sample(gen, vc, hc, v, h, vhist, vchist, min_steps, max_steps, verbose);
+        return sample(gen, vc, hc, v, h, vhist, vchist, hhist, hchist, min_steps, max_steps, verbose);
     }
 };
 
