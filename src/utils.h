@@ -8,7 +8,10 @@
 template <typename Derived>
 void apply_sigmoid(Eigen::MatrixBase<Derived>& x)
 {
-    x.array() = 1.0 / (1.0 + (-x).array().exp());
+    typedef typename Derived::Scalar Scalar;
+
+    x.array() = x.array().max(Scalar(-10)).min(Scalar(10));
+    x.array() = Scalar(1) / (Scalar(1) + (-x).array().exp());
 }
 
 // log(exp(x1) + ... + exp(xn))
