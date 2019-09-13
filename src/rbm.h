@@ -170,7 +170,7 @@ public:
         RBMSampler<Scalar> sampler(m_w, m_b, m_c);
 
         // MCMC path
-        Vector vk(m_m), hk_mean(m_n);
+        Vector vk(m_m), vk_mean(m_m), hk(m_n), hk_mean(m_n);
         Matrix vhist, vchist, hhist, hchist;
 
         // # discarded samples
@@ -182,12 +182,23 @@ public:
         tau_t += vchist.cols();
 
         vk.noalias() = vhist.col(burnin);
+        hk.noalias() = hhist.col(burnin);
+        vk_mean.noalias() = m_w * hk + m_b;
+        apply_sigmoid(vk_mean);
         hk_mean.noalias() = m_w.transpose() * vk + m_c;
         apply_sigmoid(hk_mean);
+
+        Matrix vhist_mean = m_w * hhist.rightCols(remain);
+        vhist_mean.colwise() += m_b;
+        apply_sigmoid(vhist_mean);
 
         Matrix hhist_mean = m_w.transpose() * vhist.rightCols(remain);
         hhist_mean.colwise() += m_c;
         apply_sigmoid(hhist_mean);
+
+        Matrix vchist_mean = m_w * hchist.rightCols(remain);
+        vchist_mean.colwise() += m_b;
+        apply_sigmoid(vchist_mean);
 
         Matrix hchist_mean = m_w.transpose() * vchist.rightCols(remain);
         hchist_mean.colwise() += m_c;
@@ -199,18 +210,30 @@ public:
 
         db_t.noalias() = vk + vhist.rightCols(remain).rowwise().sum() -
             vchist.rightCols(remain).rowwise().sum();
-        dc_t.noalias() = hk_mean + hhist_mean.rowwise().sum() -
-            hchist_mean.rowwise().sum();
+        dc_t.noalias() = hk + hhist.rightCols(remain).rowwise().sum() -
+            hchist.rightCols(remain).rowwise().sum();
         dw_t.noalias() = vk * hk_mean.transpose() +
             vhist.rightCols(remain) * hhist_mean.transpose() -
             vchist.rightCols(remain) * hchist_mean.transpose();
 
+        db_t.noalias() += vk_mean + vhist_mean.rowwise().sum() -
+            vchist_mean.rowwise().sum();
+        dc_t.noalias() += hk_mean + hhist_mean.rowwise().sum() -
+            hchist_mean.rowwise().sum();
+        dw_t.noalias() += vk_mean * hk.transpose() +
+            vhist_mean * hhist.rightCols(remain).transpose() -
+            vchist_mean * hchist.rightCols(remain).transpose();
+
+        dw_t.noalias() += vk * hk.transpose() +
+            vhist.rightCols(remain) * hhist.rightCols(remain).transpose() -
+            vchist.rightCols(remain) * hchist.rightCols(remain).transpose();
+
         // Accumulate gradients
         #pragma omp critical
         {
-            m_db2.noalias() += db_t;
-            m_dc2.noalias() += dc_t;
-            m_dw2.noalias() += dw_t;
+            m_db2.noalias() += 0.5 * db_t;
+            m_dc2.noalias() += 0.5 * dc_t;
+            m_dw2.noalias() += dw_t / 3.0;
         }
     }
 
