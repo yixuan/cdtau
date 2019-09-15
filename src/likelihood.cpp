@@ -67,10 +67,7 @@ double loglik_rbm_approx(MapMat w, MapVec b, MapVec c, MapMat dat,
     if(b.size() != m || c.size() != n || dat.rows() != m)
         Rcpp::stop("Dimensions do not match");
 
-    if(vr)
-        return loglik_rbm_approx_vr(m, n, N, w.data(), b.data(), c.data(), dat.data(), nsamp, nstep);
-
-    return loglik_rbm_approx(m, n, N, w.data(), b.data(), c.data(), dat.data(), nsamp, nstep);
+    return loglik_rbm_approx(m, n, N, w.data(), b.data(), c.data(), dat.data(), nsamp, nstep, vr);
 }
 
 /*

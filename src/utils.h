@@ -4,14 +4,17 @@
 #include <RcppEigen.h>
 #include <random>
 
-// x => sigmoid(x)
-template <typename Derived>
-void apply_sigmoid(Eigen::MatrixBase<Derived>& x)
+// Test x == y
+template <typename Scalar>
+bool all_equal(const Eigen::Matrix<Scalar, Eigen::Dynamic, 1>& x, const Eigen::Matrix<Scalar, Eigen::Dynamic, 1>& y, const double eps = 1e-12)
 {
-    typedef typename Derived::Scalar Scalar;
-
-    x.array() = x.array().max(Scalar(-10)).min(Scalar(10));
-    x.array() = Scalar(1) / (Scalar(1) + (-x).array().exp());
+    const int n = x.size();
+    for(int i = 0; i < n; i++)
+    {
+        if(std::abs(x[i] - y[i]) > eps)
+            return false;
+    }
+    return true;
 }
 
 // log(exp(x1) + ... + exp(xn))
@@ -30,7 +33,7 @@ Scalar log1exp(const Scalar& x)
     return std::log(Scalar(1) + std::exp(-std::abs(x))) + std::max(x, Scalar(0));
 }
 
-// log(1 + exp(x1)), ..., log(1 + exp(xn))
+// x => log(1 + exp(x))
 template <typename Derived>
 void apply_log1exp(Eigen::MatrixBase<Derived>& x)
 {
@@ -43,6 +46,35 @@ void apply_log1exp(Eigen::MatrixBase<Derived>& x)
         xptr[i] = log1exp(xptr[i]);
     }
 }
+
+// x => sigmoid(x)
+template <typename Derived>
+void apply_sigmoid(Eigen::MatrixBase<Derived>& x)
+{
+    typedef typename Derived::Scalar Scalar;
+
+    x.array() = x.array().max(Scalar(-10)).min(Scalar(10));
+    x.array() = Scalar(1) / (Scalar(1) + (-x).array().exp());
+}
+
+// x * log(p) + (1 - x) * log(1 - p)
+template <typename Scalar>
+Scalar loglik_bernoulli(const Scalar* prob, const Scalar* x, int n)
+{
+    Scalar res = 0.0;
+    for(int i = 0; i < n; i++)
+    {
+        res += (x[i] > 0.5) ? (std::log(prob[i])) : (std::log(1.0 - prob[i]));
+    }
+    return res;
+}
+template <typename Scalar>
+Scalar loglik_bernoulli(const Eigen::Matrix<Scalar, Eigen::Dynamic, 1>& prob, const Eigen::Matrix<Scalar, Eigen::Dynamic, 1>& x)
+{
+    return loglik_bernoulli(prob.data(), x.data(), prob.size());
+}
+
+
 
 // res ~ Uniform(0, 1), RNG from R
 template <typename Derived>
@@ -93,49 +125,29 @@ void random_bernoulli(const Eigen::MatrixBase<Derived>& prob, Eigen::MatrixBase<
     for(int i = 0; i < n; i++)
         res_ptr[i] = Scalar(distr(gen) <= prob_ptr[i]);
 }
+
 // res ~ Bernoulli(prob), given prob and uniform random variates
 template <typename Derived>
 void random_bernoulli_uvar(const Eigen::MatrixBase<Derived>& prob,
                            const Eigen::MatrixBase<Derived>& uvar,
-                           Eigen::MatrixBase<Derived>& res,
-                           bool antithetic = false)
+                           Eigen::MatrixBase<Derived>& res)
 {
     typedef typename Derived::Scalar Scalar;
 
-    if(antithetic)
-        res.array() = (uvar.array() >= (Scalar(1) - prob.array())).template cast<Scalar>();
-    else
-        res.array() = (uvar.array() <= prob.array()).template cast<Scalar>();
+    res.array() = (uvar.array() <= prob.array()).template cast<Scalar>();
 }
 
-// x * log(p) + (1 - x) * log(1 - p)
+// Apply U to the first part of res, and (1 - U) to the second part
+// prob [r x 2N], uvar [r x N], res [r x 2N]
 template <typename Scalar>
-Scalar loglik_bernoulli(const Scalar* prob, const Scalar* x, int n)
+void random_bernoulli_uvar_antithetic(
+    const Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic>& prob,
+    const Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic>& uvar,
+    Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic>& res)
 {
-    Scalar res = 0.0;
-    for(int i = 0; i < n; i++)
-    {
-        res += (x[i] > 0.5) ? (std::log(prob[i])) : (std::log(1.0 - prob[i]));
-    }
-    return res;
-}
-template <typename Scalar>
-Scalar loglik_bernoulli(const Eigen::Matrix<Scalar, Eigen::Dynamic, 1>& prob, const Eigen::Matrix<Scalar, Eigen::Dynamic, 1>& x)
-{
-    return loglik_bernoulli(prob.data(), x.data(), prob.size());
-}
-
-// Test x == y
-template <typename Scalar>
-bool all_equal(const Eigen::Matrix<Scalar, Eigen::Dynamic, 1>& x, const Eigen::Matrix<Scalar, Eigen::Dynamic, 1>& y, const double eps = 1e-12)
-{
-    const int n = x.size();
-    for(int i = 0; i < n; i++)
-    {
-        if(std::abs(x[i] - y[i]) > eps)
-            return false;
-    }
-    return true;
+    const int n1 = uvar.cols();
+    res.leftCols(n1).array() = (uvar.array() <= prob.leftCols(n1).array()).template cast<Scalar>();
+    res.rightCols(n1).array() = (uvar.array() >= (Scalar(1) - prob.rightCols(n1).array())).template cast<Scalar>();
 }
 
 // Random shuffling
