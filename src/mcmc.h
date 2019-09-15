@@ -345,6 +345,60 @@ public:
         }
     }
 
+    // Sample k steps on multiple chains, using the same initial vector
+    // Generate an antithetic pair
+    void sample_k_mc_pair(std::mt19937& gen, const Vector& v0,
+                          Matrix& v, Matrix& h, Matrix& vc, Matrix& hc,
+                          int k = 10, int nchain = 5) const
+    {
+        v.resize(m_m, nchain);
+        h.resize(m_n, nchain);
+        vc.resize(m_m, nchain);
+        hc.resize(m_n, nchain);
+
+        // Mean of h
+        h.noalias() = m_w.transpose() * v0.replicate(1, nchain);
+        h.colwise() += m_c;
+        apply_sigmoid(h);
+
+        // Common RNG
+        Matrix uv(m_m, nchain), uh(m_n, nchain);
+        random_uniform(uh, gen);
+
+        // Antithetic h
+        random_bernoulli_uvar(h, uh, hc, true);
+        random_bernoulli_uvar(h, uh, h, false);
+
+        for(int i = 0; i < k; i++)
+        {
+            // Antithetic v
+            random_uniform(uv, gen);
+
+            v.noalias() = m_w * h;
+            v.colwise() += m_b;
+            apply_sigmoid(v);
+            random_bernoulli_uvar(v, uv, v, false);
+
+            vc.noalias() = m_w * hc;
+            vc.colwise() += m_b;
+            apply_sigmoid(vc);
+            random_bernoulli_uvar(vc, uv, vc, true);
+
+            // Antithetic h
+            random_uniform(uh, gen);
+
+            h.noalias() = m_w.transpose() * v;
+            h.colwise() += m_c;
+            apply_sigmoid(h);
+            random_bernoulli_uvar(h, uh, h, false);
+
+            hc.noalias() = m_w.transpose() * vc;
+            hc.colwise() += m_c;
+            apply_sigmoid(hc);
+            random_bernoulli_uvar(hc, uh, hc, true);
+        }
+    }
+
     // Unbiased sampling
     // vc0, hc0, v1, and h1 will be updated
     int sample(

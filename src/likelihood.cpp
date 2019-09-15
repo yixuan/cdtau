@@ -16,6 +16,7 @@ typedef Eigen::Map<MatrixXd> MapMat;
 //' @param dat     The observed data, of size \code{[m x N]}.
 //' @param nsamp   Size of the Monte Carlo sample for approximation.
 //' @param nstep   Number of steps in the Gibbs sampler.
+//' @param vr      Whether to use variance reduction technique.
 //'
 //' @examples
 //' set.seed(123)
@@ -56,7 +57,7 @@ double loglik_rbm(MapMat w, MapVec b, MapVec c, MapMat dat)
 //' @rdname loglik_rbm
 // [[Rcpp::export]]
 double loglik_rbm_approx(MapMat w, MapVec b, MapVec c, MapMat dat,
-                         int nsamp = 100, int nstep = 10)
+                         int nsamp = 100, int nstep = 10, bool vr = true)
 {
     const int m = w.rows();
     const int n = w.cols();
@@ -65,6 +66,9 @@ double loglik_rbm_approx(MapMat w, MapVec b, MapVec c, MapMat dat,
     // Check dimension
     if(b.size() != m || c.size() != n || dat.rows() != m)
         Rcpp::stop("Dimensions do not match");
+
+    if(vr)
+        return loglik_rbm_approx_vr(m, n, N, w.data(), b.data(), c.data(), dat.data(), nsamp, nstep);
 
     return loglik_rbm_approx(m, n, N, w.data(), b.data(), c.data(), dat.data(), nsamp, nstep);
 }
@@ -87,7 +91,22 @@ double loglik_rbm_approx(MapMat w, MapVec b, MapVec c, MapMat dat,
  }
 
  loglik_rbm(w, b, c, dat)
- loglik_rbm_approx(w, b, c, dat, nsamp = 100, nstep = 10)
+ loglik_rbm_approx(w, b, c, dat, nsamp = 100, nstep = 10, vr = FALSE)
+ loglik_rbm_approx(w, b, c, dat, nsamp = 100, nstep = 10, vr = TRUE)
  loglik_rbm_approx(w, b, c, dat, nsamp = 100, nstep = 100)
+
+ exact = loglik_rbm(w, b, c, dat)
+ est1 = c()
+ est2 = c()
+ for(i in 1:100)
+ {
+     print(i)
+     est1 = c(est1, loglik_rbm_approx(w, b, c, dat, nsamp = 20, nstep = 20, vr = FALSE))
+     est2 = c(est2, loglik_rbm_approx(w, b, c, dat, nsamp = 20, nstep = 20, vr = TRUE))
+ }
+ mean(est1) - exact
+ mean(est2) - exact
+ var(est1)
+ var(est2)
 
 */
