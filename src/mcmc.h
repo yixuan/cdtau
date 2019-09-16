@@ -32,7 +32,8 @@ private:
     ) const
     {
         // Sample the main chain, p(h|v1)
-        Vector h1mean = m_w.transpose() * v1 + m_c;
+        Vector h1mean(m_n);
+        rbm_op_h(m_w, v1, m_c, h1mean);
         apply_sigmoid(h1mean);
         Vector uh(m_n);
         random_uniform(uh, gen);
@@ -49,7 +50,8 @@ private:
 
         // Let the two chains meet with a positive probability
         // p(h) / q(h) = p(h|v1) / p(h|vc0)
-        Vector hc0mean = m_w.transpose() * vc0 + m_c;
+        Vector hc0mean(m_n);
+        rbm_op_h(m_w, vc0, m_c, hc0mean);
         apply_sigmoid(hc0mean);
         Scalar logph1 = loglik_bernoulli_simd(h1mean, h1);
         Scalar logqh1 = loglik_bernoulli_simd(hc0mean, h1);
@@ -113,7 +115,8 @@ private:
     ) const
     {
         // Sample the main chain, p(v|h1)
-        Vector v2mean = m_w * h1 + m_b;
+        Vector v2mean(m_m);
+        rbm_op_v(m_w, h1, m_b, v2mean);
         apply_sigmoid(v2mean);
         Vector uv(m_m);
         random_uniform(uv, gen);
@@ -130,7 +133,8 @@ private:
 
         // Let the two chains meet with a positive probability
         // p(h) / q(h) = p(v|h1) / p(v|hc0)
-        Vector vc1mean = m_w * hc0 + m_b;
+        Vector vc1mean(m_m);
+        rbm_op_v(m_w, hc0, m_b, vc1mean);
         apply_sigmoid(vc1mean);
         Scalar logpv2 = loglik_bernoulli_simd(v2mean, v2);
         Scalar logqv2 = loglik_bernoulli_simd(vc1mean, v2);
@@ -330,8 +334,8 @@ public:
 
         // Seeds for gen in each iteration
         typedef std::mt19937::result_type SeedType;
-        std::vector<SeedType> seeds(max_steps);
-        for(int i = 0; i < max_steps; i++)
+        std::vector<SeedType> seeds(2 * max_steps);
+        for(int i = 0; i < 2 * max_steps; i++)
             seeds[i] = gen2();
 
         Vector v(m_m), h(m_n), vc(m_m), hc(m_n);
@@ -340,12 +344,12 @@ public:
         hc.setZero();
         vc.noalias() = v0;              // vc0 = v0
 
-        h.noalias() = m_w.transpose() * v0 + m_c;
+        rbm_op_h(m_w, vc, m_c, h);
         apply_sigmoid(h);
         random_uniform(uh, gen);
         random_bernoulli_uvar(h, uh, h, antithetic);    // h1
 
-        v.noalias() = m_w * h + m_b;
+        rbm_op_v(m_w, h, m_b, v);
         apply_sigmoid(v);
         random_uniform(uv, gen);
         random_bernoulli_uvar(v, uv, v, antithetic);    // v1
@@ -362,11 +366,10 @@ public:
 
         for(int i = 0; i < max_steps; i++)
         {
-            gen.seed(seeds[i]);
-
             if(verbose)
                 Rcpp::Rcout << "===== Gibbs iteration " << i << " =====" << std::endl;
 
+            gen.seed(seeds[i]);
             discard += maxcoup_h_update(gen, gen2, antithetic, v, vc, h, hc, 10, verbose);
             if(i >= min_steps && all_equal(h, hc))
             {
@@ -375,6 +378,7 @@ public:
                 break;
             }
 
+            gen.seed(seeds[max_steps + i]);
             discard += maxcoup_v_update(gen, gen2, antithetic, h, hc, v, vc, 10, verbose);
 
             vs.push_back(v);

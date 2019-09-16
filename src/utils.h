@@ -4,6 +4,63 @@
 #include <RcppEigen.h>
 #include <random>
 
+template <typename Scalar>
+void rbm_op_v(
+    const Eigen::Ref< const Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic> >& w,
+    const Eigen::Matrix<Scalar, Eigen::Dynamic, 1>& h,
+    const Eigen::Ref< const Eigen::Matrix<Scalar, Eigen::Dynamic, 1> >& b,
+    Eigen::Matrix<Scalar, Eigen::Dynamic, 1>& v
+)
+{
+    v.noalias() = w * h + b;
+    /* v.noalias() = b;
+    const Scalar* hptr = h.data();
+    const int n = h.size();
+    for(int i = 0; i < n; i++)
+    {
+        if(hptr[i] > Scalar(0.5))
+        {
+            v.noalias() += w.col(i);
+        }
+    } */
+}
+
+template <typename Scalar>
+void rbm_op_h(
+    const Eigen::Ref< const Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic> >& w,
+    const Eigen::Matrix<Scalar, Eigen::Dynamic, 1>& v,
+    const Eigen::Ref< const Eigen::Matrix<Scalar, Eigen::Dynamic, 1> >& c,
+    Eigen::Matrix<Scalar, Eigen::Dynamic, 1>& h
+)
+{
+    h.noalias() = w.transpose() * v + c;
+    /* h.noalias() = c;
+    const int m = w.rows();
+    const int n = w.cols();
+
+    const Scalar* vptr = v.data();
+    std::vector<int> nz;
+    for(int i = 0; i < m; i++)
+    {
+        if(vptr[i] > Scalar(0.5))
+            nz.push_back(i);
+    }
+    const int nnz = nz.size();
+    const int* nzptr = &nz[0];
+
+    const Scalar* colptr = w.data();
+    Scalar* hptr = h.data();
+    for(int i = 0; i < n; i++, colptr += m)
+    {
+        Scalar res = Scalar(0);
+        for(int j = 0; j < nnz; j++)
+            res += colptr[nzptr[j]];
+        hptr[i] += res;
+    } */
+}
+
+
+
 // Test x == y
 template <typename Scalar>
 bool all_equal(const Eigen::Matrix<Scalar, Eigen::Dynamic, 1>& x, const Eigen::Matrix<Scalar, Eigen::Dynamic, 1>& y, const double eps = 1e-12)
