@@ -130,11 +130,15 @@ void random_bernoulli(const Eigen::MatrixBase<Derived>& prob, Eigen::MatrixBase<
 template <typename Derived>
 void random_bernoulli_uvar(const Eigen::MatrixBase<Derived>& prob,
                            const Eigen::MatrixBase<Derived>& uvar,
-                           Eigen::MatrixBase<Derived>& res)
+                           Eigen::MatrixBase<Derived>& res,
+                           bool antithetic = false)
 {
     typedef typename Derived::Scalar Scalar;
 
-    res.array() = (uvar.array() <= prob.array()).template cast<Scalar>();
+    if(antithetic)
+        res.array() = (uvar.array() >= (Scalar(1) - prob.array())).template cast<Scalar>();
+    else
+        res.array() = (uvar.array() <= prob.array()).template cast<Scalar>();
 }
 
 // Apply U to the first part of res, and (1 - U) to the second part

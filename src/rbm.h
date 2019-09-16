@@ -163,7 +163,7 @@ public:
     }
 
     // Compute the second term of gradient using unbiased CD
-    void accumulate_grad2_ucd(int id, int seed, int min_mcmc, int max_mcmc, int verbose, Scalar& tau_t, Scalar& disc_t)
+    void accumulate_grad2_ucd(int id, int seed, bool antithetic, int min_mcmc, int max_mcmc, int verbose, Scalar& tau_t, Scalar& disc_t)
     {
         // Sampler
         std::mt19937 gen(seed);
@@ -174,7 +174,7 @@ public:
         Matrix vhist, vchist, hhist, hchist;
 
         // # discarded samples
-        disc_t = sampler.sample(gen, m_v0.col(id), vhist, vchist, hhist, hchist,
+        disc_t = sampler.sample(gen, antithetic, m_v0.col(id), vhist, vchist, hhist, hchist,
                                 min_mcmc, max_mcmc, verbose > 2);
         const int burnin = min_mcmc - 1;
         const int remain = vchist.cols() - burnin;

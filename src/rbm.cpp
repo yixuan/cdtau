@@ -226,7 +226,12 @@ List rbm_ucd_warm_(
             for(int j = 0; j < nchain; j++)
             {
                 Scalar tau_t = 0.0, disc_t = 0.0;
-                rbm.accumulate_grad2_ucd(j, seeds[j], min_mcmc, max_mcmc, verbose, tau_t, disc_t);
+                // If j is an odd number, let the chain be antithetic with chain j-1
+                // const bool antithetic = (j % 2 == 1);
+                // const int id = antithetic ? (j - 1) : j;
+                const bool antithetic = false;
+                const int id = j;
+                rbm.accumulate_grad2_ucd(id, seeds[id], antithetic, min_mcmc, max_mcmc, verbose, tau_t, disc_t);
 
                 tau_sum += tau_t;
                 disc_sum += disc_t;

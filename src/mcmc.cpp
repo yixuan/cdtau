@@ -61,7 +61,7 @@ List rbm_sample_tau(
     MatrixXd vhist, vchist, hhist, hchist;
     std::mt19937 gen(int(R::unif_rand() * 10000));
 
-    sampler.sample(gen, Rcpp::as<MapVec>(v0), vhist, vchist, hhist, hchist,
+    sampler.sample(gen, false, Rcpp::as<MapVec>(v0), vhist, vchist, hhist, hchist,
                    min_steps, max_steps, verbose);
     return List::create(
         Rcpp::Named("v") = vhist,
