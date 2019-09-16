@@ -31,6 +31,10 @@ private:
     Vector    m_dc2;
     Matrix    m_dw2;
 
+    Vector    m_db;
+    Vector    m_dc;
+    Matrix    m_dw;
+
     Matrix    m_v0;
     Matrix    m_vchains;
     Matrix    m_hchains;
@@ -40,11 +44,16 @@ public:
     m_m(m), m_n(n), m_nchain(nchain),
     m_b(m), m_c(n), m_w(m, n),
     m_db1(m), m_dc1(n), m_dw1(m, n), m_db2(m), m_dc2(n), m_dw2(m, n),
+    m_db(m), m_dc(n), m_dw(m, n),
     m_v0(m, nchain), m_vchains(m, nchain), m_hchains(n, nchain)
     {
         random_normal(m_b.data(), m, Scalar(0), Scalar(0.1));
         random_normal(m_c.data(), n, Scalar(0), Scalar(0.1));
         random_normal(m_w.data(), m * n, Scalar(0), Scalar(0.1));
+
+        m_db.setZero();
+        m_dc.setZero();
+        m_dw.setZero();
     }
 
     template <typename OtherScalar>
@@ -55,11 +64,16 @@ public:
         m_m(m), m_n(n), m_nchain(nchain),
         m_b(m), m_c(n), m_w(m, n),
         m_db1(m), m_dc1(n), m_dw1(m, n), m_db2(m), m_dc2(n), m_dw2(m, n),
+        m_db(m), m_dc(n), m_dw(m, n),
         m_v0(m, nchain), m_vchains(m, nchain), m_hchains(n, nchain)
     {
         m_b.noalias() = b0.template cast<Scalar>();
         m_c.noalias() = c0.template cast<Scalar>();
         m_w.noalias() = w0.template cast<Scalar>();
+
+        m_db.setZero();
+        m_dc.setZero();
+        m_dw.setZero();
     }
 
     // Log-likelihood value
@@ -237,11 +251,15 @@ public:
         }
     }
 
-    void update_param(Scalar lr, int n2)
+    void update_param(Scalar lr, Scalar momentum, int n2)
     {
-        m_b.noalias() += lr * (m_db1 - m_db2 / n2);
-        m_c.noalias() += lr * (m_dc1 - m_dc2 / n2);
-        m_w.noalias() += lr * (m_dw1 - m_dw2 / n2);
+        m_db.noalias() = momentum * m_db + lr * (m_db1 - m_db2 / n2);
+        m_dc.noalias() = momentum * m_dc + lr * (m_dc1 - m_dc2 / n2);
+        m_dw.noalias() = momentum * m_dw + lr * (m_dw1 - m_dw2 / n2);
+
+        m_b.noalias() += m_db;
+        m_c.noalias() += m_dc;
+        m_w.noalias() += m_dw;
     }
 
     const Matrix& get_w() const { return m_w; }

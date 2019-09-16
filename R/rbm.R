@@ -11,6 +11,7 @@
 #' @param c0            Initial value for the bias parameter for the hidden units, of size \code{[n x 1]}.
 #' @param batch_size    Size of the mini-batch.
 #' @param lr            Learning rate.
+#' @param momentum      Momentum coefficient in SGD.
 #' @param niter         Number of iterations.
 #' @param ngibbs        The "k" in the CD-k algorithm.
 #' @param nchain        Number of independent Markov chains to approximate gradient.
@@ -44,15 +45,15 @@ rbm_cdk = function(
 #'
 rbm_ucd = function(
     m, n, dat, b0 = NULL, c0 = NULL, w0 = NULL,
-    batch_size = 10L, lr = 0.1, niter = 100L, min_mcmc = 1L, max_mcmc = 100L, nchain = 1L,
+    batch_size = 10L, lr = 0.1, momentum = 0.0, niter = 100L, min_mcmc = 1L, max_mcmc = 100L, nchain = 1L,
     eval_loglik = FALSE, exact_loglik = FALSE,
     eval_freq = 10L, eval_size = 100L, eval_nmc = 100L, eval_nstep = 10L, verbose = 0L
 )
 {
     if(is.null(b0) || is.null(c0) || is.null(w0))
     {
-        .Call(`_cdtau_rbm_ucd_`, m, n, dat, batch_size, lr, niter, min_mcmc, max_mcmc, nchain, eval_loglik, exact_loglik, eval_freq, eval_size, eval_nmc, eval_nstep, verbose)
+        .Call(`_cdtau_rbm_ucd_`, m, n, dat, batch_size, lr, momentum, niter, min_mcmc, max_mcmc, nchain, eval_loglik, exact_loglik, eval_freq, eval_size, eval_nmc, eval_nstep, verbose)
     } else {
-        .Call(`_cdtau_rbm_ucd_warm_`, m, n, dat, b0, c0, w0, batch_size, lr, niter, min_mcmc, max_mcmc, nchain, eval_loglik, exact_loglik, eval_freq, eval_size, eval_nmc, eval_nstep, verbose)
+        .Call(`_cdtau_rbm_ucd_warm_`, m, n, dat, b0, c0, w0, batch_size, lr, momentum, niter, min_mcmc, max_mcmc, nchain, eval_loglik, exact_loglik, eval_freq, eval_size, eval_nmc, eval_nstep, verbose)
     }
 }
