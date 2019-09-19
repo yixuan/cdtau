@@ -227,10 +227,10 @@ List rbm_ucd_warm_(
             {
                 Scalar tau_t = 0.0, disc_t = 0.0;
                 // If j is an odd number, let the chain be antithetic with chain j-1
-                // const bool antithetic = (j % 2 == 1);
-                // const int id = antithetic ? (j - 1) : j;
-                const bool antithetic = false;
-                const int id = j;
+                const bool antithetic = (j % 2 == 1);
+                const int id = antithetic ? (j - 1) : j;
+                // const bool antithetic = false;
+                // const int id = j;
                 rbm.accumulate_grad2_ucd(id, seeds[id], antithetic, min_mcmc, max_mcmc, verbose, tau_t, disc_t);
 
                 tau_sum += tau_t;
@@ -238,7 +238,7 @@ List rbm_ucd_warm_(
             }
 
             // Update parameters
-            rbm.update_param(lr, momemtum, nchain);
+            rbm.update_param_ucd(lr, momemtum, nchain);
 
             // Compute log-likelihood every `eval_freq` mini-batches
             if(batch_id % eval_freq == 0)

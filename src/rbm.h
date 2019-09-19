@@ -29,7 +29,11 @@ private:
 
     Vector    m_db2;
     Vector    m_dc2;
-    Matrix    m_dw2;
+    Matrix    m_dw2_1;
+    Matrix    m_dw2_11;
+    Matrix    m_dw2_2;
+    Matrix    m_dw2_22;
+    Matrix    m_dw2_12;
 
     Vector    m_db;
     Vector    m_dc;
@@ -43,7 +47,8 @@ public:
     RBM(int m, int n, int nchain) :
     m_m(m), m_n(n), m_nchain(nchain),
     m_b(m), m_c(n), m_w(m, n),
-    m_db1(m), m_dc1(n), m_dw1(m, n), m_db2(m), m_dc2(n), m_dw2(m, n),
+    m_db1(m), m_dc1(n), m_dw1(m, n), m_db2(m), m_dc2(n),
+    m_dw2_1(m, n), m_dw2_11(m, n), m_dw2_2(m, n), m_dw2_22(m, n), m_dw2_12(m, n),
     m_db(m), m_dc(n), m_dw(m, n),
     m_v0(m, nchain), m_vchains(m, nchain), m_hchains(n, nchain)
     {
@@ -63,7 +68,8 @@ public:
         Eigen::Map< Eigen::Matrix<OtherScalar, Eigen::Dynamic, Eigen::Dynamic> > w0) :
         m_m(m), m_n(n), m_nchain(nchain),
         m_b(m), m_c(n), m_w(m, n),
-        m_db1(m), m_dc1(n), m_dw1(m, n), m_db2(m), m_dc2(n), m_dw2(m, n),
+        m_db1(m), m_dc1(n), m_dw1(m, n), m_db2(m), m_dc2(n),
+        m_dw2_1(m, n), m_dw2_11(m, n), m_dw2_2(m, n), m_dw2_22(m, n), m_dw2_12(m, n),
         m_db(m), m_dc(n), m_dw(m, n),
         m_v0(m, nchain), m_vchains(m, nchain), m_hchains(n, nchain)
     {
@@ -123,7 +129,11 @@ public:
     {
         m_db2.setZero();
         m_dc2.setZero();
-        m_dw2.setZero();
+        m_dw2_1.setZero();
+        m_dw2_11.setZero();
+        m_dw2_2.setZero();
+        m_dw2_22.setZero();
+        m_dw2_12.setZero();
     }
 
     // Initialize Gibbs sampler using ramdomly selected observations
@@ -153,7 +163,7 @@ public:
 
         m_db2.noalias() = m_vchains.rowwise().sum();
         m_dc2.noalias() = m_hchains.rowwise().sum();
-        m_dw2.noalias() = m_vchains * m_hchains.transpose();
+        m_dw2_1.noalias() = m_vchains * m_hchains.transpose();
     }
 
     // Compute the second term of gradient using PCD-k
@@ -173,7 +183,7 @@ public:
 
         m_db2.noalias() = vchains.rowwise().sum();
         m_dc2.noalias() = m_hchains.rowwise().sum();
-        m_dw2.noalias() = vchains * m_hchains.transpose();
+        m_dw2_1.noalias() = vchains * m_hchains.transpose();
     }
 
     // Compute the second term of gradient using unbiased CD
@@ -219,35 +229,31 @@ public:
         apply_sigmoid(hchist_mean);
 
         // Compute the second term of gradient
-        Vector db_t = Vector::Zero(m_m), dc_t = Vector::Zero(m_n);
-        Matrix dw_t = Matrix::Zero(m_m, m_n);
+        Vector db_t(m_m), dc_t(m_n);
+        Matrix dw_t1(m_m, m_n), dw_t2(m_m, m_n);
 
-        db_t.noalias() = vk + vhist.rightCols(remain).rowwise().sum() -
-            vchist.rightCols(remain).rowwise().sum();
-        dc_t.noalias() = hk + hhist.rightCols(remain).rowwise().sum() -
-            hchist.rightCols(remain).rowwise().sum();
-        dw_t.noalias() = vk * hk_mean.transpose() +
+        db_t.noalias() = vk_mean + vhist_mean.rowwise().sum() -
+            vchist_mean.rowwise().sum();
+        dc_t.noalias() = hk_mean + hhist_mean.rowwise().sum() -
+            hchist_mean.rowwise().sum();
+        dw_t1.noalias() = vk * hk_mean.transpose() +
             vhist.rightCols(remain) * hhist_mean.transpose() -
             vchist.rightCols(remain) * hchist_mean.transpose();
-
-        db_t.noalias() += vk_mean + vhist_mean.rowwise().sum() -
-            vchist_mean.rowwise().sum();
-        dc_t.noalias() += hk_mean + hhist_mean.rowwise().sum() -
-            hchist_mean.rowwise().sum();
-        dw_t.noalias() += vk_mean * hk.transpose() +
+        dw_t2.noalias() = vk_mean * hk.transpose() +
             vhist_mean * hhist.rightCols(remain).transpose() -
             vchist_mean * hchist.rightCols(remain).transpose();
-
-        dw_t.noalias() += vk * hk.transpose() +
-            vhist.rightCols(remain) * hhist.rightCols(remain).transpose() -
-            vchist.rightCols(remain) * hchist.rightCols(remain).transpose();
 
         // Accumulate gradients
         #pragma omp critical
         {
-            m_db2.noalias() += 0.5 * db_t;
-            m_dc2.noalias() += 0.5 * dc_t;
-            m_dw2.noalias() += dw_t / 3.0;
+            m_db2.noalias() += db_t;
+            m_dc2.noalias() += dc_t;
+
+            m_dw2_1.noalias() += dw_t1;
+            m_dw2_11.noalias() += dw_t1.cwiseAbs2();
+            m_dw2_2.noalias() += dw_t2;
+            m_dw2_22.noalias() += dw_t2.cwiseAbs2();
+            m_dw2_12.noalias() += dw_t1.cwiseProduct(dw_t2);
         }
     }
 
@@ -255,7 +261,56 @@ public:
     {
         m_db.noalias() = momentum * m_db + lr * (m_db1 - m_db2 / n2);
         m_dc.noalias() = momentum * m_dc + lr * (m_dc1 - m_dc2 / n2);
-        m_dw.noalias() = momentum * m_dw + lr * (m_dw1 - m_dw2 / n2);
+        m_dw.noalias() = momentum * m_dw + lr * (m_dw1 - m_dw2_1 / n2);
+
+        m_b.noalias() += m_db;
+        m_c.noalias() += m_dc;
+        m_w.noalias() += m_dw;
+    }
+
+    void update_param_ucd(Scalar lr, Scalar momentum, int n2)
+    {
+        m_db.noalias() = momentum * m_db + lr * (m_db1 - m_db2 / n2);
+        m_dc.noalias() = momentum * m_dc + lr * (m_dc1 - m_dc2 / n2);
+        // m_dw.noalias() = momentum * m_dw + lr * (m_dw1 - (Scalar(0.5) * m_dw2_1 + Scalar(0.5) * m_dw2_2) / n2);
+
+        // mu1 = w1 / n2
+        // mu2 = w2 / n2
+        // s11 = (w11 - w1^2 / n2) / (n2 - 1)
+        // s22 = (w22 - w2^2 / n2) / (n2 - 1)
+        // s12 = (w12 - w1 * w2 / n2) / (n2 - 1)
+        // p = (s22 - s12) / (s11 + s22 - 2 * s12)
+        // est = p * mu1 + (1 - p) * mu2 = p * (mu1 - mu2) + mu2
+
+        //        w22 - w12 + (w1 - w2) * w2 / n2
+        // p = --------------------------------------
+        //     w11 + w22 - 2 * w12 - (w1 - w2)^2 / n2
+
+        // Matrix weight = (m_dw2_22 - m_dw2_12 + (m_dw2_1 - m_dw2_2).cwiseProduct(m_dw2_2) / n2).cwiseQuotient(
+        //     m_dw2_11 + m_dw2_22 - Scalar(2) * m_dw2_12 - (m_dw2_1 - m_dw2_2).cwiseAbs2() / n2
+        // );
+
+        Matrix weight(m_m, m_n);
+        const Scalar *w1 = m_dw2_1.data(), *w11 = m_dw2_11.data(), *w2 = m_dw2_2.data(),
+                     *w22 = m_dw2_22.data(), *w12 = m_dw2_12.data();
+        Scalar* p = weight.data();
+        for(int i = 0; i < m_m * m_n; i++)
+        {
+            const Scalar numer = w22[i] - w12[i] + (w1[i] - w2[i]) * w2[i] / n2;
+            const Scalar denom = w11[i] + w22[i] - 2 * w12[i] - (w1[i] - w2[i]) * (w1[i] - w2[i]) / n2;
+            const Scalar denom_sign = (denom >= Scalar(0)) - (denom < Scalar(0));
+            p[i] = numer / (std::abs(denom) + Scalar(1e-3)) * denom_sign;
+        }
+
+        m_dw.noalias() = momentum * m_dw + lr * (m_dw1 - (weight.cwiseProduct(m_dw2_1 - m_dw2_2) + m_dw2_2) / n2);
+
+        // Matrix numer = m_dw2_22 - m_dw2_12 + (m_dw2_1 - m_dw2_2).cwiseProduct(m_dw2_2) / n2;
+        // Matrix denom = m_dw2_11 + m_dw2_22 - m_dw2_12 + ((m_dw2_1 - m_dw2_2).cwiseProduct(m_dw2_2) - m_dw2_1.cwiseAbs2()) / n2;
+        // Matrix weight = numer.cwiseQuotient(denom);
+
+        // Rcpp::Rcout << "numer: " << numer.maxCoeff() << ", " << numer.minCoeff() << ", " << numer.cwiseAbs().minCoeff() << std::endl;
+        // Rcpp::Rcout << "denom: " << denom.maxCoeff() << ", " << denom.minCoeff() << ", " << denom.cwiseAbs().minCoeff() << std::endl;
+        // Rcpp::Rcout << "weight: " << weight.maxCoeff() << ", " << weight.minCoeff() << std::endl << std::endl;
 
         m_b.noalias() += m_db;
         m_c.noalias() += m_dc;
