@@ -31,11 +31,11 @@ private:
         int max_try = 10, bool verbose = false
     ) const
     {
+        Vector h1mean(m_n), uh(m_n);
+
         // Sample the main chain, p(h|v1)
-        Vector h1mean(m_n);
         rbm_op_h(m_w, v1, m_c, h1mean);
         apply_sigmoid(h1mean);
-        Vector uh(m_n);
         random_uniform(uh, gen);
         random_bernoulli_uvar(h1mean, uh, h1, antithetic);
 
@@ -53,10 +53,11 @@ private:
         Vector hc0mean(m_n);
         rbm_op_h(m_w, vc0, m_c, hc0mean);
         apply_sigmoid(hc0mean);
-        Scalar logph1 = loglik_bernoulli_simd(h1mean, h1);
-        Scalar logqh1 = loglik_bernoulli_simd(hc0mean, h1);
-        std::exponential_distribution<Scalar> exp_distr(1.0);
-        Scalar u = exp_distr(gen2);
+
+        const Scalar logph1 = loglik_bernoulli_simd(h1mean, h1);
+        const Scalar logqh1 = loglik_bernoulli_simd(hc0mean, h1);
+        std::exponential_distribution<Scalar> exp_distr(Scalar(1));
+        const Scalar u = exp_distr(gen2);
         if(u >= logph1 - logqh1)
         {
             if(verbose)
@@ -66,6 +67,7 @@ private:
         }
 
         // Otherwise, sample the two chains conditional on no-meet
+        // Use the same RNG to generate proposals to make the two chains correlated
         bool h1_set = false, hc0_set = false;
         for(int i = 0; i < max_try; i++)
         {
@@ -78,9 +80,9 @@ private:
                 random_bernoulli_uvar(h1mean, uh, h1, antithetic);
                 // Accept h1 with probability 1-q(h1)/p(h1)
                 // <=> Exp(1) < log[p(h1)] - log[q(h1)]
-                Scalar logph1 = loglik_bernoulli_simd(h1mean, h1);
-                Scalar logqh1 = loglik_bernoulli_simd(hc0mean, h1);
-                Scalar u1 = exp_distr(gen2);
+                const Scalar logph1 = loglik_bernoulli_simd(h1mean, h1);
+                const Scalar logqh1 = loglik_bernoulli_simd(hc0mean, h1);
+                const Scalar u1 = exp_distr(gen2);
                 h1_set = (u1 < logph1 - logqh1);
             }
 
@@ -90,9 +92,9 @@ private:
                 random_bernoulli_uvar(hc0mean, uh, hc0, antithetic);
                 // Accept hc0 with probability 1-p(hc0)/q(hc0)
                 // <=> Exp(1) < log[q(hc0)] - log[p(hc0)]
-                Scalar logphc0 = loglik_bernoulli_simd(h1mean, hc0);
-                Scalar logqhc0 = loglik_bernoulli_simd(hc0mean, hc0);
-                Scalar u2 = exp_distr(gen2);
+                const Scalar logphc0 = loglik_bernoulli_simd(h1mean, hc0);
+                const Scalar logqhc0 = loglik_bernoulli_simd(hc0mean, hc0);
+                const Scalar u2 = exp_distr(gen2);
                 hc0_set = (u2 < logqhc0 - logphc0);
             }
 
@@ -114,11 +116,11 @@ private:
         int max_try = 10, bool verbose = false
     ) const
     {
+        Vector v2mean(m_m), uv(m_m);
+
         // Sample the main chain, p(v|h1)
-        Vector v2mean(m_m);
         rbm_op_v(m_w, h1, m_b, v2mean);
         apply_sigmoid(v2mean);
-        Vector uv(m_m);
         random_uniform(uv, gen);
         random_bernoulli_uvar(v2mean, uv, v2, antithetic);
 
@@ -136,10 +138,11 @@ private:
         Vector vc1mean(m_m);
         rbm_op_v(m_w, hc0, m_b, vc1mean);
         apply_sigmoid(vc1mean);
-        Scalar logpv2 = loglik_bernoulli_simd(v2mean, v2);
-        Scalar logqv2 = loglik_bernoulli_simd(vc1mean, v2);
+
+        const Scalar logpv2 = loglik_bernoulli_simd(v2mean, v2);
+        const Scalar logqv2 = loglik_bernoulli_simd(vc1mean, v2);
         std::exponential_distribution<Scalar> exp_distr(1.0);
-        Scalar u = exp_distr(gen2);
+        const Scalar u = exp_distr(gen2);
         if(u >= logpv2 - logqv2)
         {
             if(verbose)
@@ -149,6 +152,7 @@ private:
         }
 
         // Otherwise, sample the two chains conditional on no-meet
+        // Use the same RNG to generate proposals to make the two chains correlated
         bool v2_set = false, vc1_set = false;
         for(int i = 0; i < max_try; i++)
         {
@@ -161,9 +165,9 @@ private:
                 random_bernoulli_uvar(v2mean, uv, v2, antithetic);
                 // Accept v2 with probability 1-q(v2)/p(v2)
                 // <=> Exp(1) < log[p(v2)] - log[q(v2)]
-                Scalar logpv2 = loglik_bernoulli_simd(v2mean, v2);
-                Scalar logqv2 = loglik_bernoulli_simd(vc1mean, v2);
-                Scalar u1 = exp_distr(gen2);
+                const Scalar logpv2 = loglik_bernoulli_simd(v2mean, v2);
+                const Scalar logqv2 = loglik_bernoulli_simd(vc1mean, v2);
+                const Scalar u1 = exp_distr(gen2);
                 v2_set = (u1 < logpv2 - logqv2);
             }
 
@@ -173,9 +177,9 @@ private:
                 random_bernoulli_uvar(vc1mean, uv, vc1, antithetic);
                 // Accept vc1 with probability 1-p(vc1)/q(vc1)
                 // <=> Exp(1) < log[q(vc1)] - log[p(vc1)]
-                Scalar logpvc1 = loglik_bernoulli_simd(v2mean, vc1);
-                Scalar logqvc1 = loglik_bernoulli_simd(vc1mean, vc1);
-                Scalar u2 = exp_distr(gen2);
+                const Scalar logpvc1 = loglik_bernoulli_simd(v2mean, vc1);
+                const Scalar logqvc1 = loglik_bernoulli_simd(vc1mean, vc1);
+                const Scalar u2 = exp_distr(gen2);
                 vc1_set = (u2 < logqvc1 - logpvc1);
             }
 
@@ -313,7 +317,6 @@ public:
     }
 
     // Unbiased sampling
-    // vc0, hc0, v1, and h1 will be updated
     int sample(
         std::mt19937& gen, bool antithetic, RefConstVec& v0,
         Matrix& vhist, Matrix& vchist, Matrix& hhist, Matrix& hchist,
@@ -371,6 +374,7 @@ public:
 
             gen.seed(seeds[i]);
             discard += maxcoup_h_update(gen, gen2, antithetic, v, vc, h, hc, 10, verbose);
+
             if(i >= min_steps && all_equal(h, hc))
             {
                 if(verbose)

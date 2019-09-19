@@ -4,6 +4,9 @@
 #include <RcppEigen.h>
 #include <random>
 
+// The common operation W * h + b in RBM
+// Since h is a binary vector, theoretically we can make it faster
+// However benchmarking results show that BLAS may still provide better performance
 template <typename Scalar>
 void rbm_op_v(
     const Eigen::Ref< const Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic> >& w,
@@ -13,6 +16,7 @@ void rbm_op_v(
 )
 {
     v.noalias() = w * h + b;
+
     /* v.noalias() = b;
     const Scalar* hptr = h.data();
     const int n = h.size();
@@ -25,6 +29,7 @@ void rbm_op_v(
     } */
 }
 
+// The common operation W' * v + c in RBM
 template <typename Scalar>
 void rbm_op_h(
     const Eigen::Ref< const Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic> >& w,
@@ -34,6 +39,7 @@ void rbm_op_h(
 )
 {
     h.noalias() = w.transpose() * v + c;
+
     /* h.noalias() = c;
     const int m = w.rows();
     const int n = w.cols();
@@ -63,7 +69,9 @@ void rbm_op_h(
 
 // Test x == y
 template <typename Scalar>
-bool all_equal(const Eigen::Matrix<Scalar, Eigen::Dynamic, 1>& x, const Eigen::Matrix<Scalar, Eigen::Dynamic, 1>& y, const double eps = 1e-12)
+bool all_equal(const Eigen::Matrix<Scalar, Eigen::Dynamic, 1>& x,
+               const Eigen::Matrix<Scalar, Eigen::Dynamic, 1>& y,
+               const double eps = 1e-12)
 {
     const int n = x.size();
     for(int i = 0; i < n; i++)
@@ -105,6 +113,7 @@ void apply_log1exp(Eigen::MatrixBase<Derived>& x)
 }
 
 // x => sigmoid(x)
+// x is clipped to [-10, 10]
 template <typename Derived>
 void apply_sigmoid(Eigen::MatrixBase<Derived>& x)
 {
@@ -118,10 +127,10 @@ void apply_sigmoid(Eigen::MatrixBase<Derived>& x)
 template <typename Scalar>
 Scalar loglik_bernoulli(const Scalar* prob, const Scalar* x, int n)
 {
-    Scalar res = 0.0;
+    Scalar res = Scalar(0);
     for(int i = 0; i < n; i++)
     {
-        res += (x[i] > 0.5) ? (std::log(prob[i])) : (std::log(1.0 - prob[i]));
+        res += (x[i] > Scalar(0.5)) ? (std::log(prob[i])) : (std::log(Scalar(1) - prob[i]));
     }
     return res;
 }
@@ -152,7 +161,7 @@ void random_uniform(Eigen::MatrixBase<Derived>& res, std::mt19937& gen)
 
     const int n = res.size();
     Scalar* res_ptr = res.derived().data();
-    std::uniform_real_distribution<Scalar> distr(0.0, 1.0);
+    std::uniform_real_distribution<Scalar> distr(Scalar(0),Scalar(1));
     for(int i = 0; i < n; i++)
         res_ptr[i] = distr(gen);
 }
@@ -178,12 +187,13 @@ void random_bernoulli(const Eigen::MatrixBase<Derived>& prob, Eigen::MatrixBase<
     const int n = prob.size();
     const Scalar* prob_ptr = prob.derived().data();
     Scalar* res_ptr = res.derived().data();
-    std::uniform_real_distribution<Scalar> distr(0.0, 1.0);
+    std::uniform_real_distribution<Scalar> distr(Scalar(0),Scalar(1));
     for(int i = 0; i < n; i++)
         res_ptr[i] = Scalar(distr(gen) <= prob_ptr[i]);
 }
 
 // res ~ Bernoulli(prob), given prob and uniform random variates
+// If antithetic == true, use 1-U as the uniform random variate
 template <typename Derived>
 void random_bernoulli_uvar(const Eigen::MatrixBase<Derived>& prob,
                            const Eigen::MatrixBase<Derived>& uvar,

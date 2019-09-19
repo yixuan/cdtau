@@ -23,17 +23,22 @@ private:
     Vector    m_c;
     Matrix    m_w;
 
+    // First term of the gradient, computed from the data
     Vector    m_db1;
     Vector    m_dc1;
     Matrix    m_dw1;
 
+    // Second term of the gradient, computed from MCMC
     Vector    m_db2;
     Vector    m_dc2;
-    Matrix    m_dw2_1;
-    Matrix    m_dw2_11;
-    Matrix    m_dw2_2;
-    Matrix    m_dw2_22;
-    Matrix    m_dw2_12;
+    // There are two estimators for dw2, x and y
+    // The final estimator is a weighted average, p*x + (1-p)*y
+    // We use the following quantities to compute the optimal weight p
+    Matrix    m_dw2_1;    // sum x_i
+    Matrix    m_dw2_11;   // sum x_i^2
+    Matrix    m_dw2_2;    // sum y_i
+    Matrix    m_dw2_22;   // sum y_i^2
+    Matrix    m_dw2_12;   // sum x_i*y_i
 
     Vector    m_db;
     Vector    m_dc;
@@ -45,12 +50,12 @@ private:
 
 public:
     RBM(int m, int n, int nchain) :
-    m_m(m), m_n(n), m_nchain(nchain),
-    m_b(m), m_c(n), m_w(m, n),
-    m_db1(m), m_dc1(n), m_dw1(m, n), m_db2(m), m_dc2(n),
-    m_dw2_1(m, n), m_dw2_11(m, n), m_dw2_2(m, n), m_dw2_22(m, n), m_dw2_12(m, n),
-    m_db(m), m_dc(n), m_dw(m, n),
-    m_v0(m, nchain), m_vchains(m, nchain), m_hchains(n, nchain)
+        m_m(m), m_n(n), m_nchain(nchain),
+        m_b(m), m_c(n), m_w(m, n),
+        m_db1(m), m_dc1(n), m_dw1(m, n), m_db2(m), m_dc2(n),
+        m_dw2_1(m, n), m_dw2_11(m, n), m_dw2_2(m, n), m_dw2_22(m, n), m_dw2_12(m, n),
+        m_db(m), m_dc(n), m_dw(m, n),
+        m_v0(m, nchain), m_vchains(m, nchain), m_hchains(n, nchain)
     {
         random_normal(m_b.data(), m, Scalar(0), Scalar(0.1));
         random_normal(m_c.data(), n, Scalar(0), Scalar(0.1));
@@ -101,7 +106,7 @@ public:
         }
 
         const Scalar res = exact ?
-        (loglik_rbm_exact(m_m, m_n, nobs, m_w.data(), m_b.data(), m_c.data(), subdat.data())) :
+            (loglik_rbm_exact(m_m, m_n, nobs, m_w.data(), m_b.data(), m_c.data(), subdat.data())) :
             (loglik_rbm_approx(m_m, m_n, nobs, m_w.data(), m_b.data(), m_c.data(), subdat.data(), nmc, nstep));
 
         return res;
@@ -121,7 +126,7 @@ public:
 
         m_db1.noalias() = vmb.rowwise().mean();
         m_dc1.noalias() = hmean.rowwise().mean();
-        m_dw1.noalias() = (1.0 / bs) * vmb * hmean.transpose();
+        m_dw1.noalias() = (Scalar(1) / bs) * vmb * hmean.transpose();
     }
 
     // Zero out gradients
@@ -297,7 +302,7 @@ public:
         for(int i = 0; i < m_m * m_n; i++)
         {
             const Scalar numer = w22[i] - w12[i] + (w1[i] - w2[i]) * w2[i] / n2;
-            const Scalar denom = w11[i] + w22[i] - 2 * w12[i] - (w1[i] - w2[i]) * (w1[i] - w2[i]) / n2;
+            const Scalar denom = w11[i] - w12[i] - (w1[i] - w2[i]) * w1[i] / n2 + numer;
             const Scalar denom_sign = (denom >= Scalar(0)) - (denom < Scalar(0));
             p[i] = numer / (std::abs(denom) + Scalar(1e-3)) * denom_sign;
         }
