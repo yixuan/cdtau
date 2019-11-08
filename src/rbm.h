@@ -95,9 +95,9 @@ public:
         const int N = dat.cols();
         nobs = std::min(nobs, N);
         Matrix subdat(m_m, nobs);
-        if(exact)
+        if(nobs == N)
         {
-            subdat.noalias() = dat.leftCols(nobs).template cast<Scalar>();
+            subdat.noalias() = dat.template cast<Scalar>();
         } else {
             for(int i = 0; i < nobs; i++)
             {
