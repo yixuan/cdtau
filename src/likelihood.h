@@ -39,14 +39,27 @@ Scalar loglik_rbm_exact(
     MapVec b(bp, m), c(cp, n);
 
     // log(Z)
-    // https://arxiv.org/pdf/1510.02255.pdf, Eqn. (5)
-    Matrix vperm = permutation<Scalar>(m);
-    Vector logzv = vperm.transpose() * b;
-    Matrix vpermwc = w.transpose() * vperm;
-    vpermwc.colwise() += c;
-    apply_log1exp_simd(vpermwc);
-    logzv.noalias() += vpermwc.colwise().sum().transpose();
-    const Scalar logz = log_sum_exp(logzv);
+    Scalar logz = Scalar(0);
+    if(m <= n)
+    {
+        // If m <= n, https://arxiv.org/pdf/1510.02255.pdf, Eqn. (5)
+        Matrix vperm = permutation<Scalar>(m);
+        Vector logzv = vperm.transpose() * b;
+        Matrix vpermwc = w.transpose() * vperm;
+        vpermwc.colwise() += c;
+        apply_log1exp_simd(vpermwc);
+        logzv.noalias() += vpermwc.colwise().sum().transpose();
+        logz = log_sum_exp(logzv);
+    } else {
+        // If m > n, https://arxiv.org/pdf/1510.02255.pdf, Eqn. (6)
+        Matrix hperm = permutation<Scalar>(n);
+        Vector logzh = hperm.transpose() * c;
+        Matrix hpermwb = w * hperm;
+        hpermwb.colwise() += b;
+        apply_log1exp_simd(hpermwb);
+        logzh.noalias() += hpermwb.colwise().sum().transpose();
+        logz = log_sum_exp(logzh);
+    }
 
     // https://arxiv.org/pdf/1510.02255.pdf, Eqn. (4)
     Scalar term1 = dat.rowwise().sum().dot(b);
