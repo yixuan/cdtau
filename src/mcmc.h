@@ -26,18 +26,16 @@ private:
     // gen2 is used for other purposes, such as rejection
     int maxcoup_h_update(
         std::mt19937& gen, std::mt19937& gen2, bool antithetic,
-        const Vector& v1, const Vector& vc0,
+        const Vector& v1, const Vector& vc0, const Vector& h1mean_v1, const Vector& hc0mean_vc0,
         Vector& h1, Vector& hc0,
         int max_try = 10, bool verbose = false
     ) const
     {
-        Vector h1mean(m_n), uh(m_n);
+        Vector uh(m_n);
 
         // Sample the main chain, p(h|v1)
-        rbm_op_h(m_w, v1, m_c, h1mean);
-        apply_sigmoid(h1mean);
         random_uniform(uh, gen);
-        random_bernoulli_uvar(h1mean, uh, h1, antithetic);
+        random_bernoulli_uvar(h1mean_v1, uh, h1, antithetic);
 
         // If v1 == vc0, also make h1 == hc0 and early exit
         if(all_equal(v1, vc0))
@@ -50,12 +48,8 @@ private:
 
         // Let the two chains meet with a positive probability
         // p(h) / q(h) = p(h|v1) / p(h|vc0)
-        Vector hc0mean(m_n);
-        rbm_op_h(m_w, vc0, m_c, hc0mean);
-        apply_sigmoid(hc0mean);
-
-        const Scalar logph1 = loglik_bernoulli_simd(h1mean, h1);
-        const Scalar logqh1 = loglik_bernoulli_simd(hc0mean, h1);
+        const Scalar logph1 = loglik_bernoulli_simd(h1mean_v1, h1);
+        const Scalar logqh1 = loglik_bernoulli_simd(hc0mean_vc0, h1);
         std::exponential_distribution<Scalar> exp_distr(Scalar(1));
         const Scalar u = exp_distr(gen2);
         if(u >= logph1 - logqh1)
@@ -77,11 +71,11 @@ private:
             // Sample h1
             if(!h1_set)
             {
-                random_bernoulli_uvar(h1mean, uh, h1, antithetic);
+                random_bernoulli_uvar(h1mean_v1, uh, h1, antithetic);
                 // Accept h1 with probability 1-q(h1)/p(h1)
                 // <=> Exp(1) < log[p(h1)] - log[q(h1)]
-                const Scalar logph1 = loglik_bernoulli_simd(h1mean, h1);
-                const Scalar logqh1 = loglik_bernoulli_simd(hc0mean, h1);
+                const Scalar logph1 = loglik_bernoulli_simd(h1mean_v1, h1);
+                const Scalar logqh1 = loglik_bernoulli_simd(hc0mean_vc0, h1);
                 const Scalar u1 = exp_distr(gen2);
                 h1_set = (u1 < logph1 - logqh1);
             }
@@ -89,11 +83,11 @@ private:
             // Sample hc0
             if(!hc0_set)
             {
-                random_bernoulli_uvar(hc0mean, uh, hc0, antithetic);
+                random_bernoulli_uvar(hc0mean_vc0, uh, hc0, antithetic);
                 // Accept hc0 with probability 1-p(hc0)/q(hc0)
                 // <=> Exp(1) < log[q(hc0)] - log[p(hc0)]
-                const Scalar logphc0 = loglik_bernoulli_simd(h1mean, hc0);
-                const Scalar logqhc0 = loglik_bernoulli_simd(hc0mean, hc0);
+                const Scalar logphc0 = loglik_bernoulli_simd(h1mean_v1, hc0);
+                const Scalar logqhc0 = loglik_bernoulli_simd(hc0mean_vc0, hc0);
                 const Scalar u2 = exp_distr(gen2);
                 hc0_set = (u2 < logqhc0 - logphc0);
             }
@@ -111,18 +105,16 @@ private:
     // (h1, hc0) -> (v2, vc1)
     int maxcoup_v_update(
         std::mt19937& gen, std::mt19937& gen2, bool antithetic,
-        const Vector& h1, const Vector& hc0,
+        const Vector& h1, const Vector& hc0, const Vector& v2mean_h1, const Vector& vc1mean_hc0,
         Vector& v2, Vector& vc1,
         int max_try = 10, bool verbose = false
     ) const
     {
-        Vector v2mean(m_m), uv(m_m);
+        Vector uv(m_m);
 
         // Sample the main chain, p(v|h1)
-        rbm_op_v(m_w, h1, m_b, v2mean);
-        apply_sigmoid(v2mean);
         random_uniform(uv, gen);
-        random_bernoulli_uvar(v2mean, uv, v2, antithetic);
+        random_bernoulli_uvar(v2mean_h1, uv, v2, antithetic);
 
         // If h1 == hc0, also make v2 == vc1 and early exit
         if(all_equal(h1, hc0))
@@ -135,12 +127,8 @@ private:
 
         // Let the two chains meet with a positive probability
         // p(h) / q(h) = p(v|h1) / p(v|hc0)
-        Vector vc1mean(m_m);
-        rbm_op_v(m_w, hc0, m_b, vc1mean);
-        apply_sigmoid(vc1mean);
-
-        const Scalar logpv2 = loglik_bernoulli_simd(v2mean, v2);
-        const Scalar logqv2 = loglik_bernoulli_simd(vc1mean, v2);
+        const Scalar logpv2 = loglik_bernoulli_simd(v2mean_h1, v2);
+        const Scalar logqv2 = loglik_bernoulli_simd(vc1mean_hc0, v2);
         std::exponential_distribution<Scalar> exp_distr(1.0);
         const Scalar u = exp_distr(gen2);
         if(u >= logpv2 - logqv2)
@@ -162,11 +150,11 @@ private:
             // Sample v2
             if(!v2_set)
             {
-                random_bernoulli_uvar(v2mean, uv, v2, antithetic);
+                random_bernoulli_uvar(v2mean_h1, uv, v2, antithetic);
                 // Accept v2 with probability 1-q(v2)/p(v2)
                 // <=> Exp(1) < log[p(v2)] - log[q(v2)]
-                const Scalar logpv2 = loglik_bernoulli_simd(v2mean, v2);
-                const Scalar logqv2 = loglik_bernoulli_simd(vc1mean, v2);
+                const Scalar logpv2 = loglik_bernoulli_simd(v2mean_h1, v2);
+                const Scalar logqv2 = loglik_bernoulli_simd(vc1mean_hc0, v2);
                 const Scalar u1 = exp_distr(gen2);
                 v2_set = (u1 < logpv2 - logqv2);
             }
@@ -174,11 +162,11 @@ private:
             // Sample vc1
             if(!vc1_set)
             {
-                random_bernoulli_uvar(vc1mean, uv, vc1, antithetic);
+                random_bernoulli_uvar(vc1mean_hc0, uv, vc1, antithetic);
                 // Accept vc1 with probability 1-p(vc1)/q(vc1)
                 // <=> Exp(1) < log[q(vc1)] - log[p(vc1)]
-                const Scalar logpvc1 = loglik_bernoulli_simd(v2mean, vc1);
-                const Scalar logqvc1 = loglik_bernoulli_simd(vc1mean, vc1);
+                const Scalar logpvc1 = loglik_bernoulli_simd(v2mean_h1, vc1);
+                const Scalar logqvc1 = loglik_bernoulli_simd(vc1mean_hc0, vc1);
                 const Scalar u2 = exp_distr(gen2);
                 vc1_set = (u2 < logqvc1 - logpvc1);
             }
@@ -342,20 +330,25 @@ public:
             seeds[i] = gen2();
 
         Vector v(m_m), h(m_n), vc(m_m), hc(m_n);
+        Vector vmean_h(m_m), hmean_v(m_n), vcmean_hc(m_m), hcmean_vc(m_n);
         Vector uv(m_m), uh(m_n);
 
         hc.setZero();
-        vc.noalias() = v0;              // vc0 = v0
+        vc.noalias() = v0;                                    // vc0 = v0
 
-        rbm_op_h(m_w, vc, m_c, h);
-        apply_sigmoid(h);
+        rbm_op_h(m_w, vc, m_c, hcmean_vc);
+        apply_sigmoid(hcmean_vc);                             // E(h|v)
         random_uniform(uh, gen);
-        random_bernoulli_uvar(h, uh, h, antithetic);    // h1
+        random_bernoulli_uvar(hcmean_vc, uh, h, antithetic);  // h1
 
-        rbm_op_v(m_w, h, m_b, v);
-        apply_sigmoid(v);
+        rbm_op_v(m_w, h, m_b, vmean_h);
+        apply_sigmoid(vmean_h);                               // E(v|h)
         random_uniform(uv, gen);
-        random_bernoulli_uvar(v, uv, v, antithetic);    // v1
+        random_bernoulli_uvar(vmean_h, uv, v, antithetic);    // v1
+
+        // E(h|v)
+        rbm_op_h(m_w, v, m_c, hmean_v);
+        apply_sigmoid(hmean_v);
 
         std::vector<Vector> vs;
         vs.push_back(v);
@@ -373,7 +366,8 @@ public:
                 Rcpp::Rcout << "===== Gibbs iteration " << i << " =====" << std::endl;
 
             gen.seed(seeds[i]);
-            discard += maxcoup_h_update(gen, gen2, antithetic, v, vc, h, hc, 10, verbose);
+            discard += maxcoup_h_update(gen, gen2, antithetic, v, vc, hmean_v, hcmean_vc,
+                                        h, hc, 10, verbose);
 
             if(i >= min_steps && all_equal(h, hc))
             {
@@ -382,8 +376,21 @@ public:
                 break;
             }
 
+            // E(v|h)
+            rbm_op_v(m_w, h, m_b, vmean_h);
+            apply_sigmoid(vmean_h);
+            rbm_op_v(m_w, hc, m_b, vcmean_hc);
+            apply_sigmoid(vcmean_hc);
+
             gen.seed(seeds[max_steps + i]);
-            discard += maxcoup_v_update(gen, gen2, antithetic, h, hc, v, vc, 10, verbose);
+            discard += maxcoup_v_update(gen, gen2, antithetic, h, hc, vmean_h, vcmean_hc,
+                                        v, vc, 10, verbose);
+
+            // E(h|v)
+            rbm_op_h(m_w, v, m_c, hmean_v);
+            apply_sigmoid(hmean_v);
+            rbm_op_h(m_w, vc, m_c, hcmean_vc);
+            apply_sigmoid(hcmean_vc);
 
             vs.push_back(v);
             vcs.push_back(vc);
@@ -414,6 +421,121 @@ public:
         hhist.col(tau).noalias() = hs[tau];
 
         return discard;
+    }
+
+
+
+    // Unbiased sampling
+    void sample_and_update_grad(
+        std::mt19937& gen, bool antithetic, RefConstVec& v0,
+        Vector& db, Vector& dc, Matrix& dw, Scalar& tau, Scalar& discard,
+        int min_steps = 1, int max_steps = 100, bool verbose = false
+    ) const
+    {
+        // We want to create a pair of antithetic chains in two sample() calls
+        // To do this, we need to make sure that the uniform random vector sequences
+        // are the same in the two calls
+        // 1. We create a second RNG for other purposes, such as generating
+        //    exponential random variables.
+        // 2. Since there are rejection steps in maxcoup_h_update() and maxcoup_v_update(),
+        //    the number of uniform random variables used in each iteration is not
+        //    deterministic. Therefore, we reset the random seeds in each iteration.
+
+        // gen() gives a random integer, used as the seed for gen2
+        std::mt19937 gen2(gen());
+
+        // Seeds for gen in each iteration
+        typedef std::mt19937::result_type SeedType;
+        std::vector<SeedType> seeds(2 * max_steps);
+        for(int i = 0; i < 2 * max_steps; i++)
+            seeds[i] = gen2();
+
+        Vector v(m_m), h(m_n), vc(m_m), hc(m_n);
+        Vector vmean_h(m_m), hmean_v(m_n), vcmean_hc(m_m), hcmean_vc(m_n);
+        Vector uv(m_m), uh(m_n);
+
+        hc.setZero();
+        vc.noalias() = v0;                                    // vc0 = v0
+
+        rbm_op_h(m_w, vc, m_c, hcmean_vc);
+        apply_sigmoid(hcmean_vc);                             // E(h|v)
+        random_uniform(uh, gen);
+        random_bernoulli_uvar(hcmean_vc, uh, h, antithetic);  // h1
+
+        rbm_op_v(m_w, h, m_b, vmean_h);
+        apply_sigmoid(vmean_h);                               // E(v|h)
+        random_uniform(uv, gen);
+        random_bernoulli_uvar(vmean_h, uv, v, antithetic);    // v1
+
+        // E(h|v)
+        rbm_op_h(m_w, v, m_c, hmean_v);
+        apply_sigmoid(hmean_v);
+
+        const int burnin = min_steps - 1;
+        int i = 0;
+        discard = 0;
+
+        for(i = 0; i < max_steps; i++)
+        {
+            if(verbose)
+                Rcpp::Rcout << "===== Gibbs iteration " << i << " =====" << std::endl;
+
+            if(i == burnin)
+            {
+                db.noalias() = Scalar(0.5) * (v + vmean_h);
+                dc.noalias() = Scalar(0.5) * (h + hmean_v);
+                dw.noalias() = Scalar(0.5) * (v * hmean_v.transpose() + vmean_h * h.transpose());
+            }
+
+            gen.seed(seeds[i]);
+            discard += maxcoup_h_update(gen, gen2, antithetic, v, vc, hmean_v, hcmean_vc,
+                                        h, hc, 10, verbose);
+
+            // If h == hc, v will be equal to vc in this iteration, making f(xi) - f(eta) = 0
+            // Hence we can directly exit the loop
+            if(i >= burnin && all_equal(h, hc))
+            {
+                if(verbose)
+                    Rcpp::Rcout << "===== Exit with meeting time = " << i + 1 << " =====" << std::endl;
+                break;
+            }
+
+            // E(v|h)
+            rbm_op_v(m_w, h, m_b, vmean_h);
+            apply_sigmoid(vmean_h);
+            rbm_op_v(m_w, hc, m_b, vcmean_hc);
+            apply_sigmoid(vcmean_hc);
+
+            gen.seed(seeds[max_steps + i]);
+            discard += maxcoup_v_update(gen, gen2, antithetic, h, hc, vmean_h, vcmean_hc,
+                                        v, vc, 10, verbose);
+
+            // E(h|v)
+            rbm_op_h(m_w, v, m_c, hmean_v);
+            apply_sigmoid(hmean_v);
+            rbm_op_h(m_w, vc, m_c, hcmean_vc);
+            apply_sigmoid(hcmean_vc);
+
+            if(i >= burnin)
+            {
+                db.noalias() += Scalar(0.5) * (v + vmean_h - vc - vcmean_hc);
+                dc.noalias() += Scalar(0.5) * (h + hmean_v - hc - hcmean_vc);
+                dw.noalias() += Scalar(0.5) * (
+                    v * hmean_v.transpose() + vmean_h * h.transpose() -
+                    vc * hcmean_vc.transpose() - vcmean_hc * hc.transpose()
+                );
+            }
+
+            if(i >= burnin && all_equal(v, vc))
+            {
+                if(verbose)
+                    Rcpp::Rcout << "===== Exit with meeting time = " << i + 1 << " =====" << std::endl;
+                break;
+            }
+
+        }
+
+        tau = i + 1;
     }
 };
 

@@ -238,7 +238,7 @@ List rbm_ucd_warm_(
             }
 
             // Update parameters
-            rbm.update_param_ucd(lr, momemtum, nchain);
+            rbm.update_param(lr, momemtum, nchain);
 
             // Compute log-likelihood every `eval_freq` mini-batches
             if(batch_id % eval_freq == 0)
