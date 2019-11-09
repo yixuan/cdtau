@@ -12,6 +12,7 @@
 
 #include "Array.h"
 #include <cmath>
+#include <limits>
 #include <iostream>
 
 #define UNSHUFFLE 0  // set to 1 to match non-SIMD ordering
@@ -52,15 +53,15 @@ static inline void print_m256i(__m256i v) {
  * for details regarding the engine.
  *
  * The Philox engine is currently used in CUDA distributions
- * kernels as its random engine. 
- * 
+ * kernels as its random engine.
+ *
  * It takes a seed value, a subsequeunce
  * for starting the generation and an offset for the sequence.
  *
- * Think of this engine as an algorithm producing a huge array. We are 
- * parallelizing this array by partitioning the huge array and assigning 
- * a thread index to each partition. In other words, each seed value 
- * (there are 2^64 possible seed values) gives a sub array of size 
+ * Think of this engine as an algorithm producing a huge array. We are
+ * parallelizing this array by partitioning the huge array and assigning
+ * a thread index to each partition. In other words, each seed value
+ * (there are 2^64 possible seed values) gives a sub array of size
  * 2^128 (each element in that array is a 128 bit number). Reasoning
  * behind the array being of size 2^128 is, there are 2^64 possible
  * thread index value and there is an array of size 2^64 for each of
@@ -73,9 +74,9 @@ static inline void print_m256i(__m256i v) {
  * seed:        Seed values could be any number from 0 to 2^64-1.
  * subsequence: Subsequence is just the cuda thread indexing with:
  *              - blockIdx.x * blockDim.x + threadIdx.x
- * offset:      The offset variable in PhiloxEngine  decides how many 128-bit 
+ * offset:      The offset variable in PhiloxEngine  decides how many 128-bit
  *              random numbers to skip (i.e. how many groups of 4, 32-bit numbers to skip)
- *              and hence really decides the total number of randoms that can be achieved 
+ *              and hence really decides the total number of randoms that can be achieved
  *              for the given subsequence.
  */
 class philox_simd_engine {
@@ -92,6 +93,10 @@ public:
     STATE = 0;
     incr_n(offset);
   }
+
+  typedef uint32_t result_type;
+  inline uint32_t min() { return std::numeric_limits<uint32_t>::min(); }
+  inline uint32_t max() { return std::numeric_limits<uint32_t>::max(); }
 
   inline void next32(__m256i& out0, __m256i& out1, __m256i& out2, __m256i& out3) {
     __m256i counter0 = _mm256_set1_epi32(counter[0]);
