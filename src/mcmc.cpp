@@ -1,4 +1,5 @@
 #include "mcmc.h"
+#include "rng.h"
 
 using Rcpp::NumericMatrix;
 using Rcpp::NumericVector;
@@ -41,7 +42,7 @@ List rbm_sample_k(MapMat w, MapVec b, MapVec c, NumericVector v0, int k = 10)
 {
     RBMSampler<double> sampler(w, b, c);
     VectorXd v, h;
-    std::mt19937 gen(int(R::unif_rand() * 10000));
+    RNGEngine gen(int(R::unif_rand() * 10000));
 
     sampler.sample_k(gen, Rcpp::as<MapVec>(v0), v, h, k);
     return List::create(
@@ -59,7 +60,7 @@ List rbm_sample_tau(
 {
     RBMSampler<double> sampler(w, b, c);
     MatrixXd vhist, vchist, hhist, hchist;
-    std::mt19937 gen(int(R::unif_rand() * 10000));
+    RNGEngine gen(int(R::unif_rand() * 10000));
 
     sampler.sample(gen, false, Rcpp::as<MapVec>(v0), vhist, vchist, hhist, hchist,
                    min_steps, max_steps, verbose);

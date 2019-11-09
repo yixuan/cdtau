@@ -208,8 +208,8 @@ void random_uniform(Eigen::MatrixBase<Derived>& res)
         res_ptr[i] = R::unif_rand();
 }
 // RNG from C++
-template <typename Derived>
-void random_uniform(Eigen::MatrixBase<Derived>& res, std::mt19937& gen)
+template <typename Derived, typename RNGType>
+void random_uniform(Eigen::MatrixBase<Derived>& res, RNGType& gen)
 {
     typedef typename Derived::Scalar Scalar;
 
@@ -233,8 +233,8 @@ void random_bernoulli(const Eigen::MatrixBase<Derived>& prob, Eigen::MatrixBase<
         res_ptr[i] = Scalar(R::unif_rand() <= prob_ptr[i]);
 }
 // RNG from C++
-template <typename Derived>
-void random_bernoulli(const Eigen::MatrixBase<Derived>& prob, Eigen::MatrixBase<Derived>& res, std::mt19937& gen)
+template <typename Derived, typename RNGType>
+void random_bernoulli(const Eigen::MatrixBase<Derived>& prob, Eigen::MatrixBase<Derived>& res, RNGType& gen)
 {
     typedef typename Derived::Scalar Scalar;
 

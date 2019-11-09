@@ -5,6 +5,7 @@
 #include "mcmc.h"
 #include "utils.h"
 #include "utils_simd.h"
+#include "rng.h"
 
 // res[n x 2^n]
 template <typename Scalar>
@@ -98,7 +99,7 @@ Scalar loglik_rbm_approx(
     for(int i = 0; i < N; i++)
     {
         RBMSampler<Scalar> sampler(w, b, c);
-        std::mt19937 gen(seeds[i]);
+        RNGEngine gen(seeds[i]);
 
         Vector v0 = dat.col(i);
         Matrix vmean(m, nsamp), h(n, nsamp);

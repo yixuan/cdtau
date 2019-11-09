@@ -4,6 +4,7 @@
 #include <RcppEigen.h>
 #include "utils.h"
 #include "utils_simd.h"
+#include "rng.h"
 
 template <typename Scalar = double>
 class RBMSampler
@@ -25,7 +26,7 @@ private:
     // gen is used to generate antithetic uniform random variables
     // gen2 is used for other purposes, such as rejection
     int maxcoup_h_update(
-        std::mt19937& gen, std::mt19937& gen2, bool antithetic,
+        RNGEngine& gen, RNGEngine& gen2, bool antithetic,
         const Vector& v1, const Vector& vc0, const Vector& h1mean_v1, const Vector& hc0mean_vc0,
         Vector& h1, Vector& hc0,
         int max_try = 10, bool verbose = false
@@ -104,7 +105,7 @@ private:
 
     // (h1, hc0) -> (v2, vc1)
     int maxcoup_v_update(
-        std::mt19937& gen, std::mt19937& gen2, bool antithetic,
+        RNGEngine& gen, RNGEngine& gen2, bool antithetic,
         const Vector& h1, const Vector& hc0, const Vector& v2mean_h1, const Vector& vc1mean_hc0,
         Vector& v2, Vector& vc1,
         int max_try = 10, bool verbose = false
@@ -190,7 +191,7 @@ public:
     }
 
     // Sample k steps
-    void sample_k(std::mt19937& gen, RefConstVec& v0, Vector& v, Vector& h, int k = 10) const
+    void sample_k(RNGEngine& gen, RefConstVec& v0, Vector& v, Vector& h, int k = 10) const
     {
         v.resize(m_m);
         h.resize(m_n);
@@ -213,7 +214,7 @@ public:
     }
 
     // Sample k steps on multiple chains, using multiple initial values
-    void sample_k_mc(std::mt19937& gen, const Matrix& v0, Matrix& v, Matrix& h, int k = 10) const
+    void sample_k_mc(RNGEngine& gen, const Matrix& v0, Matrix& v, Matrix& h, int k = 10) const
     {
         const int nchain = v0.cols();
         v.resize(m_m, nchain);
@@ -239,7 +240,7 @@ public:
     }
 
     // Sample k steps on multiple chains, using the same initial vector
-    void sample_k_mc(std::mt19937& gen, const Vector& v0, Matrix& v, Matrix& h, int k = 10, int nchain = 10) const
+    void sample_k_mc(RNGEngine& gen, const Vector& v0, Matrix& v, Matrix& h, int k = 10, int nchain = 10) const
     {
         v.resize(m_m, nchain);
         h.resize(m_n, nchain);
@@ -265,7 +266,7 @@ public:
 
     // Sample k steps on multiple chains, using the same initial vector
     // Generate antithetic pairs
-    void sample_k_mc_pair(std::mt19937& gen, const Vector& v0,
+    void sample_k_mc_pair(RNGEngine& gen, const Vector& v0,
                           Matrix& v, Matrix& h, int k = 10, int npair = 5) const
     {
         const int nchain = npair * 2;
@@ -306,7 +307,7 @@ public:
 
     // Unbiased sampling
     int sample(
-        std::mt19937& gen, bool antithetic, RefConstVec& v0,
+        RNGEngine& gen, bool antithetic, RefConstVec& v0,
         Matrix& vhist, Matrix& vchist, Matrix& hhist, Matrix& hchist,
         int min_steps = 1, int max_steps = 100, bool verbose = false
     ) const
@@ -321,10 +322,10 @@ public:
         //    deterministic. Therefore, we reset the random seeds in each iteration.
 
         // gen() gives a random integer, used as the seed for gen2
-        std::mt19937 gen2(gen());
+        RNGEngine gen2(gen());
 
         // Seeds for gen in each iteration
-        typedef std::mt19937::result_type SeedType;
+        typedef RNGEngine::result_type SeedType;
         std::vector<SeedType> seeds(2 * max_steps);
         for(int i = 0; i < 2 * max_steps; i++)
             seeds[i] = gen2();
@@ -365,7 +366,7 @@ public:
             if(verbose)
                 Rcpp::Rcout << "===== Gibbs iteration " << i << " =====" << std::endl;
 
-            gen.seed(seeds[i]);
+            gen = RNGEngine(seeds[i]);
             discard += maxcoup_h_update(gen, gen2, antithetic, v, vc, hmean_v, hcmean_vc,
                                         h, hc, 10, verbose);
 
@@ -382,7 +383,7 @@ public:
             rbm_op_v(m_w, hc, m_b, vcmean_hc);
             apply_sigmoid_simd(vcmean_hc);
 
-            gen.seed(seeds[max_steps + i]);
+            gen = RNGEngine(seeds[max_steps + i]);
             discard += maxcoup_v_update(gen, gen2, antithetic, h, hc, vmean_h, vcmean_hc,
                                         v, vc, 10, verbose);
 
@@ -427,7 +428,7 @@ public:
 
     // Unbiased sampling
     void sample_and_update_grad(
-        std::mt19937& gen, bool antithetic, RefConstVec& v0,
+        RNGEngine& gen, bool antithetic, RefConstVec& v0,
         Vector& db, Vector& dc, Matrix& dw, Scalar& tau, Scalar& discard,
         int min_steps = 1, int max_steps = 100, bool verbose = false
     ) const
@@ -442,10 +443,10 @@ public:
         //    deterministic. Therefore, we reset the random seeds in each iteration.
 
         // gen() gives a random integer, used as the seed for gen2
-        std::mt19937 gen2(gen());
+        RNGEngine gen2(gen());
 
         // Seeds for gen in each iteration
-        typedef std::mt19937::result_type SeedType;
+        typedef RNGEngine::result_type SeedType;
         std::vector<SeedType> seeds(2 * max_steps);
         for(int i = 0; i < 2 * max_steps; i++)
             seeds[i] = gen2();
@@ -487,7 +488,7 @@ public:
                 rbm_op_rank2(v, hmean_v, vmean_h, h, dw);
             }
 
-            gen.seed(seeds[i]);
+            gen = RNGEngine(seeds[i]);
             discard += maxcoup_h_update(gen, gen2, antithetic, v, vc, hmean_v, hcmean_vc,
                                         h, hc, 10, verbose);
 
@@ -506,7 +507,7 @@ public:
             rbm_op_v(m_w, hc, m_b, vcmean_hc);
             apply_sigmoid_simd(vcmean_hc);
 
-            gen.seed(seeds[max_steps + i]);
+            gen = RNGEngine(seeds[max_steps + i]);
             discard += maxcoup_v_update(gen, gen2, antithetic, h, hc, vmean_h, vcmean_hc,
                                         v, vc, 10, verbose);
 

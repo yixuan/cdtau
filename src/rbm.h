@@ -5,6 +5,7 @@
 #include "mcmc.h"
 #include "utils.h"
 #include "likelihood.h"
+#include "rng.h"
 
 template <typename Scalar = float>
 class RBM
@@ -144,7 +145,7 @@ public:
     void accumulate_grad2_cdk(int k)
     {
         // Gibbs samples
-        std::mt19937 gen(int(R::unif_rand() * 10000));
+        RNGEngine gen(int(R::unif_rand() * 10000));
         RBMSampler<Scalar> sampler(m_w, m_b, m_c);
         sampler.sample_k_mc(gen, m_v0, m_vchains, m_hchains, k);
 
@@ -162,7 +163,7 @@ public:
     void accumulate_grad2_pcdk(int k)
     {
         // Gibbs samples
-        std::mt19937 gen(int(R::unif_rand() * 10000));
+        RNGEngine gen(int(R::unif_rand() * 10000));
         RBMSampler<Scalar> sampler(m_w, m_b, m_c);
         Matrix& vchains = m_v0;
         // vchains will be updated to the last state of the Markov chain
@@ -182,7 +183,7 @@ public:
     void accumulate_grad2_ucd(int id, int seed, bool antithetic, int min_mcmc, int max_mcmc, int verbose, Scalar& tau_t, Scalar& disc_t)
     {
         // Sampler
-        std::mt19937 gen(seed);
+        RNGEngine gen(seed);
         RBMSampler<Scalar> sampler(m_w, m_b, m_c);
 
         // Compute the second term of gradient
