@@ -3,6 +3,7 @@
 
 #include <RcppEigen.h>
 #include <random>
+#include "blas.h"
 
 // The common operation W * h + b in RBM
 // Since h is a binary vector, theoretically we can make it faster
@@ -15,7 +16,12 @@ void rbm_op_v(
     Eigen::Matrix<Scalar, Eigen::Dynamic, 1>& v
 )
 {
-    v.noalias() = w * h + b;
+    const int m = w.rows();
+    const int n = w.cols();
+    blas_copy<Scalar>(m, b.data(), v.data());
+    blas_gemv<Scalar>('N', m, n, Scalar(1), w.data(), h.data(), Scalar(1), v.data());
+
+    // v.noalias() = w * h + b;
 
     /* v.noalias() = b;
     const Scalar* hptr = h.data();
@@ -38,7 +44,12 @@ void rbm_op_h(
     Eigen::Matrix<Scalar, Eigen::Dynamic, 1>& h
 )
 {
-    h.noalias() = w.transpose() * v + c;
+    const int m = w.rows();
+    const int n = w.cols();
+    blas_copy<Scalar>(n, c.data(), h.data());
+    blas_gemv<Scalar>('T', m, n, Scalar(1), w.data(), v.data(), Scalar(1), h.data());
+
+    // h.noalias() = w.transpose() * v + c;
 
     /* h.noalias() = c;
     const int m = w.rows();
@@ -63,6 +74,49 @@ void rbm_op_h(
             res += colptr[nzptr[j]];
         hptr[i] += res;
     } */
+}
+
+// w = v1 * h1' + v2 * h2'
+template <typename Scalar>
+void rbm_op_rank2(
+    const Eigen::Matrix<Scalar, Eigen::Dynamic, 1>& v1,
+    const Eigen::Matrix<Scalar, Eigen::Dynamic, 1>& h1,
+    const Eigen::Matrix<Scalar, Eigen::Dynamic, 1>& v2,
+    const Eigen::Matrix<Scalar, Eigen::Dynamic, 1>& h2,
+    Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic>& w
+)
+{
+    const int m = w.rows();
+    const int n = w.cols();
+    w.setZero();
+    blas_ger<Scalar>(m, n, Scalar(1), v1.data(), h1.data(), w.data());
+    blas_ger<Scalar>(m, n, Scalar(1), v2.data(), h2.data(), w.data());
+
+    // w.noalias() = v1 * h1.transpose() + v2 * h2.transpose();
+}
+
+// w += v1 * h1' + v2 * h2' - v3 * h3' - v4 * h4'
+template <typename Scalar>
+void rbm_op_rank4(
+    const Eigen::Matrix<Scalar, Eigen::Dynamic, 1>& v1,
+    const Eigen::Matrix<Scalar, Eigen::Dynamic, 1>& h1,
+    const Eigen::Matrix<Scalar, Eigen::Dynamic, 1>& v2,
+    const Eigen::Matrix<Scalar, Eigen::Dynamic, 1>& h2,
+    const Eigen::Matrix<Scalar, Eigen::Dynamic, 1>& v3,
+    const Eigen::Matrix<Scalar, Eigen::Dynamic, 1>& h3,
+    const Eigen::Matrix<Scalar, Eigen::Dynamic, 1>& v4,
+    const Eigen::Matrix<Scalar, Eigen::Dynamic, 1>& h4,
+    Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic>& w
+)
+{
+    const int m = w.rows();
+    const int n = w.cols();
+    blas_ger<Scalar>(m, n, Scalar(1), v1.data(), h1.data(), w.data());
+    blas_ger<Scalar>(m, n, Scalar(1), v2.data(), h2.data(), w.data());
+    blas_ger<Scalar>(m, n, Scalar(-1), v3.data(), h3.data(), w.data());
+    blas_ger<Scalar>(m, n, Scalar(-1), v4.data(), h4.data(), w.data());
+
+    // w.noalias() += v1 * h1.transpose() + v2 * h2.transpose() - v3 * h3.transpose() - v4 * h4.transpose();
 }
 
 

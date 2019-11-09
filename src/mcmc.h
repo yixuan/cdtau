@@ -35,7 +35,7 @@ private:
 
         // Sample the main chain, p(h|v1)
         random_uniform(uh, gen);
-        random_bernoulli_uvar(h1mean_v1, uh, h1, antithetic);
+        random_bernoulli_uvar_simd(h1mean_v1, uh, h1, antithetic);
 
         // If v1 == vc0, also make h1 == hc0 and early exit
         if(all_equal(v1, vc0))
@@ -71,7 +71,7 @@ private:
             // Sample h1
             if(!h1_set)
             {
-                random_bernoulli_uvar(h1mean_v1, uh, h1, antithetic);
+                random_bernoulli_uvar_simd(h1mean_v1, uh, h1, antithetic);
                 // Accept h1 with probability 1-q(h1)/p(h1)
                 // <=> Exp(1) < log[p(h1)] - log[q(h1)]
                 const Scalar logph1 = loglik_bernoulli_simd(h1mean_v1, h1);
@@ -83,7 +83,7 @@ private:
             // Sample hc0
             if(!hc0_set)
             {
-                random_bernoulli_uvar(hc0mean_vc0, uh, hc0, antithetic);
+                random_bernoulli_uvar_simd(hc0mean_vc0, uh, hc0, antithetic);
                 // Accept hc0 with probability 1-p(hc0)/q(hc0)
                 // <=> Exp(1) < log[q(hc0)] - log[p(hc0)]
                 const Scalar logphc0 = loglik_bernoulli_simd(h1mean_v1, hc0);
@@ -114,7 +114,7 @@ private:
 
         // Sample the main chain, p(v|h1)
         random_uniform(uv, gen);
-        random_bernoulli_uvar(v2mean_h1, uv, v2, antithetic);
+        random_bernoulli_uvar_simd(v2mean_h1, uv, v2, antithetic);
 
         // If h1 == hc0, also make v2 == vc1 and early exit
         if(all_equal(h1, hc0))
@@ -150,7 +150,7 @@ private:
             // Sample v2
             if(!v2_set)
             {
-                random_bernoulli_uvar(v2mean_h1, uv, v2, antithetic);
+                random_bernoulli_uvar_simd(v2mean_h1, uv, v2, antithetic);
                 // Accept v2 with probability 1-q(v2)/p(v2)
                 // <=> Exp(1) < log[p(v2)] - log[q(v2)]
                 const Scalar logpv2 = loglik_bernoulli_simd(v2mean_h1, v2);
@@ -162,7 +162,7 @@ private:
             // Sample vc1
             if(!vc1_set)
             {
-                random_bernoulli_uvar(vc1mean_hc0, uv, vc1, antithetic);
+                random_bernoulli_uvar_simd(vc1mean_hc0, uv, vc1, antithetic);
                 // Accept vc1 with probability 1-p(vc1)/q(vc1)
                 // <=> Exp(1) < log[q(vc1)] - log[p(vc1)]
                 const Scalar logpvc1 = loglik_bernoulli_simd(v2mean_h1, vc1);
@@ -196,18 +196,18 @@ public:
         h.resize(m_n);
 
         Vector hmean = m_w.transpose() * v0 + m_c;
-        apply_sigmoid(hmean);
+        apply_sigmoid_simd(hmean);
         random_bernoulli(hmean, h, gen);
 
         Vector vmean(m_m);
         for(int i = 0; i < k; i++)
         {
             vmean.noalias() = m_w * h + m_b;
-            apply_sigmoid(vmean);
+            apply_sigmoid_simd(vmean);
             random_bernoulli(vmean, v, gen);
 
             hmean.noalias() = m_w.transpose() * v + m_c;
-            apply_sigmoid(hmean);
+            apply_sigmoid_simd(hmean);
             random_bernoulli(hmean, h, gen);
         }
     }
@@ -221,19 +221,19 @@ public:
 
         h.noalias() = m_w.transpose() * v0;
         h.colwise() += m_c;
-        apply_sigmoid(h);
+        apply_sigmoid_simd(h);
         random_bernoulli(h, h, gen);
 
         for(int i = 0; i < k; i++)
         {
             v.noalias() = m_w * h;
             v.colwise() += m_b;
-            apply_sigmoid(v);
+            apply_sigmoid_simd(v);
             random_bernoulli(v, v, gen);
 
             h.noalias() = m_w.transpose() * v;
             h.colwise() += m_c;
-            apply_sigmoid(h);
+            apply_sigmoid_simd(h);
             random_bernoulli(h, h, gen);
         }
     }
@@ -246,19 +246,19 @@ public:
 
         h.noalias() = m_w.transpose() * v0.replicate(1, nchain);
         h.colwise() += m_c;
-        apply_sigmoid(h);
+        apply_sigmoid_simd(h);
         random_bernoulli(h, h, gen);
 
         for(int i = 0; i < k; i++)
         {
             v.noalias() = m_w * h;
             v.colwise() += m_b;
-            apply_sigmoid(v);
+            apply_sigmoid_simd(v);
             random_bernoulli(v, v, gen);
 
             h.noalias() = m_w.transpose() * v;
             h.colwise() += m_c;
-            apply_sigmoid(h);
+            apply_sigmoid_simd(h);
             random_bernoulli(h, h, gen);
         }
     }
@@ -275,7 +275,7 @@ public:
         // Mean of h
         h.noalias() = m_w.transpose() * v0.replicate(1, nchain);
         h.colwise() += m_c;
-        apply_sigmoid(h);
+        apply_sigmoid_simd(h);
 
         // Common RNG
         Matrix uv(m_m, npair), uh(m_n, npair);
@@ -291,7 +291,7 @@ public:
 
             v.noalias() = m_w * h;
             v.colwise() += m_b;
-            apply_sigmoid(v);
+            apply_sigmoid_simd(v);
             random_bernoulli_uvar_antithetic(v, uv, v);
 
             // Antithetic h
@@ -299,7 +299,7 @@ public:
 
             h.noalias() = m_w.transpose() * v;
             h.colwise() += m_c;
-            apply_sigmoid(h);
+            apply_sigmoid_simd(h);
             random_bernoulli_uvar_antithetic(h, uh, h);
         }
     }
@@ -334,21 +334,21 @@ public:
         Vector uv(m_m), uh(m_n);
 
         hc.setZero();
-        vc.noalias() = v0;                                    // vc0 = v0
+        vc.noalias() = v0;                                         // vc0 = v0
 
         rbm_op_h(m_w, vc, m_c, hcmean_vc);
-        apply_sigmoid(hcmean_vc);                             // E(h|v)
+        apply_sigmoid_simd(hcmean_vc);                             // E(h|v)
         random_uniform(uh, gen);
-        random_bernoulli_uvar(hcmean_vc, uh, h, antithetic);  // h1
+        random_bernoulli_uvar_simd(hcmean_vc, uh, h, antithetic);  // h1
 
         rbm_op_v(m_w, h, m_b, vmean_h);
-        apply_sigmoid(vmean_h);                               // E(v|h)
+        apply_sigmoid_simd(vmean_h);                               // E(v|h)
         random_uniform(uv, gen);
-        random_bernoulli_uvar(vmean_h, uv, v, antithetic);    // v1
+        random_bernoulli_uvar_simd(vmean_h, uv, v, antithetic);    // v1
 
         // E(h|v)
         rbm_op_h(m_w, v, m_c, hmean_v);
-        apply_sigmoid(hmean_v);
+        apply_sigmoid_simd(hmean_v);
 
         std::vector<Vector> vs;
         vs.push_back(v);
@@ -378,9 +378,9 @@ public:
 
             // E(v|h)
             rbm_op_v(m_w, h, m_b, vmean_h);
-            apply_sigmoid(vmean_h);
+            apply_sigmoid_simd(vmean_h);
             rbm_op_v(m_w, hc, m_b, vcmean_hc);
-            apply_sigmoid(vcmean_hc);
+            apply_sigmoid_simd(vcmean_hc);
 
             gen.seed(seeds[max_steps + i]);
             discard += maxcoup_v_update(gen, gen2, antithetic, h, hc, vmean_h, vcmean_hc,
@@ -388,9 +388,9 @@ public:
 
             // E(h|v)
             rbm_op_h(m_w, v, m_c, hmean_v);
-            apply_sigmoid(hmean_v);
+            apply_sigmoid_simd(hmean_v);
             rbm_op_h(m_w, vc, m_c, hcmean_vc);
-            apply_sigmoid(hcmean_vc);
+            apply_sigmoid_simd(hcmean_vc);
 
             vs.push_back(v);
             vcs.push_back(vc);
@@ -454,22 +454,21 @@ public:
         Vector vmean_h(m_m), hmean_v(m_n), vcmean_hc(m_m), hcmean_vc(m_n);
         Vector uv(m_m), uh(m_n);
 
-        hc.setZero();
-        vc.noalias() = v0;                                    // vc0 = v0
+        vc.noalias() = v0;                                         // vc0 = v0
 
         rbm_op_h(m_w, vc, m_c, hcmean_vc);
-        apply_sigmoid(hcmean_vc);                             // E(h|v)
+        apply_sigmoid_simd(hcmean_vc);                             // E(h|v)
         random_uniform(uh, gen);
-        random_bernoulli_uvar(hcmean_vc, uh, h, antithetic);  // h1
+        random_bernoulli_uvar_simd(hcmean_vc, uh, h, antithetic);  // h1
 
         rbm_op_v(m_w, h, m_b, vmean_h);
-        apply_sigmoid(vmean_h);                               // E(v|h)
+        apply_sigmoid_simd(vmean_h);                               // E(v|h)
         random_uniform(uv, gen);
-        random_bernoulli_uvar(vmean_h, uv, v, antithetic);    // v1
+        random_bernoulli_uvar_simd(vmean_h, uv, v, antithetic);    // v1
 
         // E(h|v)
         rbm_op_h(m_w, v, m_c, hmean_v);
-        apply_sigmoid(hmean_v);
+        apply_sigmoid_simd(hmean_v);
 
         const int burnin = min_steps - 1;
         int i = 0;
@@ -482,9 +481,10 @@ public:
 
             if(i == burnin)
             {
-                db.noalias() = Scalar(0.5) * (v + vmean_h);
-                dc.noalias() = Scalar(0.5) * (h + hmean_v);
-                dw.noalias() = Scalar(0.5) * (v * hmean_v.transpose() + vmean_h * h.transpose());
+                db.noalias() = v + vmean_h;
+                dc.noalias() = h + hmean_v;
+                // dw.noalias() = v * hmean_v.transpose() + vmean_h * h.transpose();
+                rbm_op_rank2(v, hmean_v, vmean_h, h, dw);
             }
 
             gen.seed(seeds[i]);
@@ -502,9 +502,9 @@ public:
 
             // E(v|h)
             rbm_op_v(m_w, h, m_b, vmean_h);
-            apply_sigmoid(vmean_h);
+            apply_sigmoid_simd(vmean_h);
             rbm_op_v(m_w, hc, m_b, vcmean_hc);
-            apply_sigmoid(vcmean_hc);
+            apply_sigmoid_simd(vcmean_hc);
 
             gen.seed(seeds[max_steps + i]);
             discard += maxcoup_v_update(gen, gen2, antithetic, h, hc, vmean_h, vcmean_hc,
@@ -512,18 +512,19 @@ public:
 
             // E(h|v)
             rbm_op_h(m_w, v, m_c, hmean_v);
-            apply_sigmoid(hmean_v);
+            apply_sigmoid_simd(hmean_v);
             rbm_op_h(m_w, vc, m_c, hcmean_vc);
-            apply_sigmoid(hcmean_vc);
+            apply_sigmoid_simd(hcmean_vc);
 
             if(i >= burnin)
             {
-                db.noalias() += Scalar(0.5) * (v + vmean_h - vc - vcmean_hc);
-                dc.noalias() += Scalar(0.5) * (h + hmean_v - hc - hcmean_vc);
-                dw.noalias() += Scalar(0.5) * (
+                db.noalias() += (v + vmean_h - vc - vcmean_hc);
+                dc.noalias() += (h + hmean_v - hc - hcmean_vc);
+                /* dw.noalias() += (
                     v * hmean_v.transpose() + vmean_h * h.transpose() -
                     vc * hcmean_vc.transpose() - vcmean_hc * hc.transpose()
-                );
+                ); */
+                rbm_op_rank4(v, hmean_v, vmean_h, h, vc, hcmean_vc, vcmean_hc, hc, dw);
             }
 
             if(i >= burnin && all_equal(v, vc))
@@ -536,6 +537,9 @@ public:
         }
 
         tau = i + 1;
+        db *= Scalar(0.5);
+        dc *= Scalar(0.5);
+        dw *= Scalar(0.5);
     }
 };
 
