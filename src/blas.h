@@ -17,6 +17,8 @@ template <>
 inline void blas_copy<float>(int n, const float* x, float* y)
 {
     int inc = 1;
+    // Eigen's ?copy definition is a bit problematic -- it uses a non-const
+    // pointer type for x, so we need to cast it
     BLASFUNC(scopy)(&n, const_cast<float*>(x), &inc, y, &inc);
 }
 
