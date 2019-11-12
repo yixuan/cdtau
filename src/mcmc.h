@@ -525,7 +525,7 @@ public:
                     v * hmean_v.transpose() + vmean_h * h.transpose() -
                     vc * hcmean_vc.transpose() - vcmean_hc * hc.transpose()
                 ); */
-                rbm_op_rank4(v, hmean_v, vmean_h, h, vc, hcmean_vc, vcmean_hc, hc, dw);
+                rbm_op_rank4_simd(v, hmean_v, vmean_h, h, vc, hcmean_vc, vcmean_hc, hc, dw);
             }
 
             if(i >= burnin && all_equal(v, vc))

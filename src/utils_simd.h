@@ -4,6 +4,102 @@
 #include <RcppEigen.h>
 #include <xsimd/xsimd.hpp>
 
+// w += v1 * h1' + v2 * h2' - v3 * h3' - v4 * h4'
+// h2 and h4 are binary vectors
+template <typename Scalar>
+void rbm_op_rank4_simd(
+    const Eigen::Matrix<Scalar, Eigen::Dynamic, 1>& v1,
+    const Eigen::Matrix<Scalar, Eigen::Dynamic, 1>& h1,
+    const Eigen::Matrix<Scalar, Eigen::Dynamic, 1>& v2,
+    const Eigen::Matrix<Scalar, Eigen::Dynamic, 1>& h2,
+    const Eigen::Matrix<Scalar, Eigen::Dynamic, 1>& v3,
+    const Eigen::Matrix<Scalar, Eigen::Dynamic, 1>& h3,
+    const Eigen::Matrix<Scalar, Eigen::Dynamic, 1>& v4,
+    const Eigen::Matrix<Scalar, Eigen::Dynamic, 1>& h4,
+    Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic>& w
+)
+{
+    typedef xsimd::batch<Scalar, xsimd::simd_type<Scalar>::size> vec;
+
+    const int m = w.rows();
+    const int n = w.cols();
+
+    const int simd_size = xsimd::simd_type<Scalar>::size;
+    const int vec_size = m - m % simd_size;
+
+    // Fall back to default implementation
+    if(vec_size != m)
+    {
+        w.noalias() += v1 * h1.transpose() + v2 * h2.transpose() - v3 * h3.transpose() - v4 * h4.transpose();
+        return;
+    }
+
+    const Scalar* v1p = v1.data();
+    const Scalar* v2p = v2.data();
+    const Scalar* v3p = v3.data();
+    const Scalar* v4p = v4.data();
+
+    for(int j = 0; j < n; j++)
+    {
+        Scalar* colp = w.col(j).data();
+        vec h1j = xsimd::set_simd(h1[j]);
+        vec h3j = xsimd::set_simd(h3[j]);
+
+        if(h2[j] <= Scalar(0.5) && h4[j] <= Scalar(0.5))
+        {
+            // w += v1 * h1 - v3 * h3
+            for(int i = 0; i < vec_size; i += simd_size)
+            {
+                vec wi = xsimd::load_aligned(colp + i);
+                vec v1i = xsimd::load_aligned(v1p + i);
+                vec v3i = xsimd::load_aligned(v3p + i);
+                // wi += v1i * h1j - v3i * h3j;
+                wi += xsimd::fms(v1i, h1j, v3i * h3j);
+                wi.store_aligned(colp + i);
+            }
+        } else if(h2[j] <= Scalar(0.5) && h4[j] > Scalar(0.5))
+        {
+            // w += v1 * h1 - v3 * h3 - v4
+            for(int i = 0; i < vec_size; i += simd_size)
+            {
+                vec wi = xsimd::load_aligned(colp + i);
+                vec v1i = xsimd::load_aligned(v1p + i);
+                vec v3i = xsimd::load_aligned(v3p + i);
+                vec v4i = xsimd::load_aligned(v4p + i);
+                // wi += v1i * h1j - v3i * h3j - v4i;
+                wi += v1i * h1j - xsimd::fma(v3i, h3j, v4i);
+                wi.store_aligned(colp + i);
+            }
+        } else if(h2[j] > Scalar(0.5) && h4[j] <= Scalar(0.5))
+        {
+            // w += v1 * h1 + v2 - v3 * h3
+            for(int i = 0; i < vec_size; i += simd_size)
+            {
+                vec wi = xsimd::load_aligned(colp + i);
+                vec v1i = xsimd::load_aligned(v1p + i);
+                vec v2i = xsimd::load_aligned(v2p + i);
+                vec v3i = xsimd::load_aligned(v3p + i);
+                // wi += v1i * h1j + v2i - v3i * h3j;
+                wi += xsimd::fma(v1i, h1j, v2i) - v3i * h3j;
+                wi.store_aligned(colp + i);
+            }
+        } else {
+            // w += v1 * h1 + v2 - v3 * h3 - v4
+            for(int i = 0; i < vec_size; i += simd_size)
+            {
+                vec wi = xsimd::load_aligned(colp + i);
+                vec v1i = xsimd::load_aligned(v1p + i);
+                vec v2i = xsimd::load_aligned(v2p + i);
+                vec v3i = xsimd::load_aligned(v3p + i);
+                vec v4i = xsimd::load_aligned(v4p + i);
+                // wi += v1i * h1j + v2i - v3i * h3j - v4i;
+                wi += xsimd::fma(v1i, h1j, v2i) - xsimd::fma(v3i, h3j, v4i);
+                wi.store_aligned(colp + i);
+            }
+        }
+    }
+}
+
 // x => log(1 + exp(x))
 template <typename Derived>
 void apply_log1exp_simd(Eigen::MatrixBase<Derived>& x)
