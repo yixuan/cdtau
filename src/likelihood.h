@@ -95,7 +95,7 @@ Scalar loglik_rbm_approx(
     // Random seeds for C++ RNG
     Rcpp::IntegerVector seeds = Rcpp::sample(100000, N, true);
 
-    #pragma omp parallel for shared(seeds, dat, w, b, c, m, n, N, nsamp, npair, nstep) reduction(+:loglik) schedule(dynamic)
+    #pragma omp parallel for shared(seeds, dat, w, b, c, m, n, N, nsamp, nstep) reduction(+:loglik) schedule(dynamic)
     for(int i = 0; i < N; i++)
     {
         RBMSampler<Scalar> sampler(w, b, c);
