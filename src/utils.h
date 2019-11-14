@@ -239,7 +239,7 @@ void random_uniform(Eigen::MatrixBase<Derived>& res, RNGType& gen)
 
     const int n = res.size();
     Scalar* res_ptr = res.derived().data();
-    const Scalar denom = Scalar(gen.max()) + Scalar(1);
+    const double denom = double(gen.max()) + 1.0;
     for(int i = 0; i < n; i++)
         res_ptr[i] = gen() / denom;
 }
@@ -265,7 +265,7 @@ void random_bernoulli(const Eigen::MatrixBase<Derived>& prob, Eigen::MatrixBase<
     const int n = prob.size();
     const Scalar* prob_ptr = prob.derived().data();
     Scalar* res_ptr = res.derived().data();
-    const Scalar denom = Scalar(gen.max()) + Scalar(1);
+    const double denom = double(gen.max()) + 1.0;
     for(int i = 0; i < n; i++)
         res_ptr[i] = Scalar(gen() / denom <= prob_ptr[i]);
 }
