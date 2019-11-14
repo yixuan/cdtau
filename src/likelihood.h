@@ -7,6 +7,17 @@
 #include "utils_simd.h"
 #include "rng.h"
 
+// ============================= OpenBLAS specific functions =============================
+#ifdef USE_OPENBLAS
+extern "C" {
+    // Set the number of threads on runtime.
+    void openblas_set_num_threads(int num_threads);
+
+    // Get the number of threads on runtime.
+    int openblas_get_num_threads(void);
+}
+#endif
+
 // res[n x 2^n]
 template <typename Scalar>
 Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic> permutation(const int n)
@@ -95,6 +106,12 @@ Scalar loglik_rbm_approx(
     // Random seeds for C++ RNG
     Rcpp::IntegerVector seeds = Rcpp::sample(100000, N, true);
 
+    // Inside OpenMP only use one thread for OpenBLAS
+#ifdef USE_OPENBLAS
+    const int nthread = openblas_get_num_threads();
+    openblas_set_num_threads(1);
+#endif
+
     #pragma omp parallel for shared(seeds, dat, w, b, c, m, n, N, nsamp, nstep) reduction(+:loglik) schedule(dynamic)
     for(int i = 0; i < N; i++)
     {
@@ -119,6 +136,10 @@ Scalar loglik_rbm_approx(
         }
         loglik += log_sum_exp(logp);
     }
+
+#ifdef USE_OPENBLAS
+    openblas_set_num_threads(nthread);
+#endif
 
     return loglik - N * std::log(Scalar(nsamp));
 }
