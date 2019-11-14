@@ -462,7 +462,7 @@ public:
         random_uniform(uh, gen);
         random_bernoulli_uvar_simd(hcmean_vc, uh, h, antithetic);  // h1
 
-        rbm_op_v(m_w, h, m_b, vmean_h);
+        rbm_op_v_simd(m_w, h, m_b, vmean_h);
         apply_sigmoid_simd(vmean_h);                               // E(v|h)
         random_uniform(uv, gen);
         random_bernoulli_uvar_simd(vmean_h, uv, v, antithetic);    // v1
@@ -502,9 +502,9 @@ public:
             }
 
             // E(v|h)
-            rbm_op_v(m_w, h, m_b, vmean_h);
+            rbm_op_v_simd(m_w, h, m_b, vmean_h);
             apply_sigmoid_simd(vmean_h);
-            rbm_op_v(m_w, hc, m_b, vcmean_hc);
+            rbm_op_v_simd(m_w, hc, m_b, vcmean_hc);
             apply_sigmoid_simd(vcmean_hc);
 
             gen = RNGEngine(seeds[max_steps + i]);

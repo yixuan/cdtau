@@ -4,6 +4,59 @@
 #include <RcppEigen.h>
 #include <xsimd/xsimd.hpp>
 
+// The common operation W * h + b in RBM
+// h is a binary vector
+template <typename Scalar>
+void rbm_op_v_simd(
+    const Eigen::Ref< const Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic> >& w,
+    const Eigen::Matrix<Scalar, Eigen::Dynamic, 1>& h,
+    const Eigen::Ref< const Eigen::Matrix<Scalar, Eigen::Dynamic, 1> >& b,
+    Eigen::Matrix<Scalar, Eigen::Dynamic, 1>& v
+)
+{
+    typedef xsimd::batch<Scalar, xsimd::simd_type<Scalar>::size> vec;
+
+    const int m = w.rows();
+    const int n = w.cols();
+
+    const int simd_size = xsimd::simd_type<Scalar>::size;
+    const int vec_size = m - m % simd_size;
+
+    // Fall back to default implementation
+    if(vec_size != m)
+    {
+        v.noalias() = w * h + b;
+        return;
+    }
+
+    const Scalar* hp = h.data();
+    const Scalar* bp = b.data();
+    Scalar* vp = v.data();
+
+    // Copy b to v
+    for(int i = 0; i < vec_size; i += simd_size)
+    {
+        vec bi = xsimd::load_aligned(bp + i);
+        bi.store_aligned(vp + i);
+    }
+
+    for(int j = 0; j < n; j++)
+    {
+        if(hp[j] > Scalar(0.5))
+        {
+            const Scalar* colp = w.col(j).data();
+
+            for(int i = 0; i < vec_size; i += simd_size)
+            {
+                vec vi = xsimd::load_aligned(vp + i);
+                vec wi = xsimd::load_aligned(colp + i);
+                vec res = vi + wi;
+                res.store_aligned(vp + i);
+            }
+        }
+    }
+}
+
 // w += v1 * h1' + v2 * h2' - v3 * h3' - v4 * h4'
 // h2 and h4 are binary vectors
 template <typename Scalar>
