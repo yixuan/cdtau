@@ -239,9 +239,9 @@ void random_uniform(Eigen::MatrixBase<Derived>& res, RNGType& gen)
 
     const int n = res.size();
     Scalar* res_ptr = res.derived().data();
-    std::uniform_real_distribution<Scalar> distr(Scalar(0),Scalar(1));
+    const Scalar denom = Scalar(gen.max()) + Scalar(1);
     for(int i = 0; i < n; i++)
-        res_ptr[i] = distr(gen);
+        res_ptr[i] = gen() / denom;
 }
 
 // res ~ Bernoulli(prob), RNG from R
@@ -265,9 +265,9 @@ void random_bernoulli(const Eigen::MatrixBase<Derived>& prob, Eigen::MatrixBase<
     const int n = prob.size();
     const Scalar* prob_ptr = prob.derived().data();
     Scalar* res_ptr = res.derived().data();
-    std::uniform_real_distribution<Scalar> distr(Scalar(0),Scalar(1));
+    const Scalar denom = Scalar(gen.max()) + Scalar(1);
     for(int i = 0; i < n; i++)
-        res_ptr[i] = Scalar(distr(gen) <= prob_ptr[i]);
+        res_ptr[i] = Scalar(gen() / denom <= prob_ptr[i]);
 }
 
 // res ~ Bernoulli(prob), given prob and uniform random variates
