@@ -28,16 +28,16 @@
 #'
 rbm_cdk = function(
     m, n, dat, b0 = NULL, c0 = NULL, w0 = NULL,
-    batch_size = 10L, lr = 0.1, niter = 100L, ngibbs = 10L, nchain = 1L, persistent = FALSE,
+    batch_size = 10L, lr = 0.1, momentum = 0.0, niter = 100L, ngibbs = 10L, nchain = 1L, persistent = FALSE,
     eval_loglik = FALSE, exact_loglik = FALSE,
     eval_freq = 10L, eval_size = 100L, eval_nmc = 100L, eval_nstep = 10L, verbose = 0L
 )
 {
     if(is.null(b0) || is.null(c0) || is.null(w0))
     {
-        .Call(`_cdtau_rbm_cdk_`, m, n, dat, batch_size, lr, niter, ngibbs, nchain, persistent, eval_loglik, exact_loglik, eval_freq, eval_size, eval_nmc, eval_nstep, verbose)
+        .Call(`_cdtau_rbm_cdk_`, m, n, dat, batch_size, lr, momentum, niter, ngibbs, nchain, persistent, eval_loglik, exact_loglik, eval_freq, eval_size, eval_nmc, eval_nstep, verbose)
     } else {
-        .Call(`_cdtau_rbm_cdk_warm_`, m, n, dat, b0, c0, w0, batch_size, lr, niter, ngibbs, nchain, persistent, eval_loglik, exact_loglik, eval_freq, eval_size, eval_nmc, eval_nstep, verbose)
+        .Call(`_cdtau_rbm_cdk_warm_`, m, n, dat, b0, c0, w0, batch_size, lr, momentum, niter, ngibbs, nchain, persistent, eval_loglik, exact_loglik, eval_freq, eval_size, eval_nmc, eval_nstep, verbose)
     }
 }
 

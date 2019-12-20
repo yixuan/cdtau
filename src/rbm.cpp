@@ -18,7 +18,7 @@ typedef Eigen::Map<MatrixXd> MapMat;
 List rbm_cdk_warm_(
     int vis_dim, int hid_dim, MapMat dat,
     MapVec b0, MapVec c0, MapMat w0,
-    int batch_size = 10, double lr = 0.1, int niter = 100,
+    int batch_size = 10, double lr = 0.1, double momentum = 0.0, int niter = 100,
     int ngibbs = 10, int nchain = 1, bool persistent = false,
     bool eval_loglik = false, bool exact_loglik = false,
     int eval_freq = 10, int eval_size = 100, int eval_nmc = 100, int eval_nstep = 10,
@@ -87,7 +87,7 @@ List rbm_cdk_warm_(
             }
 
             // Update parameters
-            rbm.update_param(lr, 0.0, nchain);
+            rbm.update_param(lr, momentum, nchain);
 
             // Compute log-likelihood every `eval_freq` mini-batches
             if(batch_id % eval_freq == 0)
@@ -114,7 +114,7 @@ List rbm_cdk_warm_(
 // [[Rcpp::export]]
 List rbm_cdk_(
     int vis_dim, int hid_dim, MapMat dat,
-    int batch_size = 10, double lr = 0.1, int niter = 100,
+    int batch_size = 10, double lr = 0.1, double momentum = 0.0, int niter = 100,
     int ngibbs = 10, int nchain = 1, bool persistent = false,
     bool eval_loglik = false, bool exact_loglik = false,
     int eval_freq = 10, int eval_size = 100, int eval_nmc = 100, int eval_nstep = 10,
@@ -137,7 +137,8 @@ List rbm_cdk_(
     random_normal(w.data(), m * n, 0.0, 0.1);
 
     return rbm_cdk_warm_(vis_dim, hid_dim, dat, b, c, w,
-                         batch_size, lr, niter, ngibbs, nchain, persistent,
+                         batch_size, lr, momentum, niter,
+                         ngibbs, nchain, persistent,
                          eval_loglik, exact_loglik,
                          eval_freq, eval_size, eval_nmc, eval_nstep,
                          verbose);
@@ -148,7 +149,7 @@ List rbm_cdk_(
 List rbm_ucd_warm_(
     int vis_dim, int hid_dim, MapMat dat,
     MapVec b0, MapVec c0, MapMat w0,
-    int batch_size = 10, double lr = 0.1, double momemtum = 0.0, int niter = 100,
+    int batch_size = 10, double lr = 0.1, double momentum = 0.0, int niter = 100,
     int min_mcmc = 1, int max_mcmc = 100, int nchain = 1,
     bool eval_loglik = false, bool exact_loglik = false,
     int eval_freq = 10, int eval_size = 100, int eval_nmc = 100, int eval_nstep = 10,
@@ -238,7 +239,7 @@ List rbm_ucd_warm_(
             }
 
             // Update parameters
-            rbm.update_param(lr, momemtum, nchain);
+            rbm.update_param(lr, momentum, nchain);
 
             // Compute log-likelihood every `eval_freq` mini-batches
             if(batch_id % eval_freq == 0)
