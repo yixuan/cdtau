@@ -11,4 +11,4 @@ Encoding: UTF-8
 LazyData: true
 Imports: Rcpp (>= 1.0.1)
 LinkingTo: Rcpp, RcppEigen, RcppXsimd
-RoxygenNote: 6.1.1
+RoxygenNote: 7.0.2

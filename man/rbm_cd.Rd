@@ -5,17 +5,51 @@
 \alias{rbm_ucd}
 \title{Train RBM Models}
 \usage{
-rbm_cdk(m, n, dat, b0 = NULL, c0 = NULL, w0 = NULL,
-  batch_size = 10L, lr = 0.1, niter = 100L, ngibbs = 10L,
-  nchain = 1L, persistent = FALSE, eval_loglik = FALSE,
-  exact_loglik = FALSE, eval_freq = 10L, eval_size = 100L,
-  eval_nmc = 100L, eval_nstep = 10L, verbose = 0L)
+rbm_cdk(
+  m,
+  n,
+  dat,
+  b0 = NULL,
+  c0 = NULL,
+  w0 = NULL,
+  batch_size = 10L,
+  lr = 0.1,
+  momentum = 0,
+  niter = 100L,
+  ngibbs = 10L,
+  nchain = 1L,
+  persistent = FALSE,
+  eval_loglik = FALSE,
+  exact_loglik = FALSE,
+  eval_freq = 10L,
+  eval_size = 100L,
+  eval_nmc = 100L,
+  eval_nstep = 10L,
+  verbose = 0L
+)
 
-rbm_ucd(m, n, dat, b0 = NULL, c0 = NULL, w0 = NULL,
-  batch_size = 10L, lr = 0.1, momentum = 0, niter = 100L,
-  min_mcmc = 1L, max_mcmc = 100L, nchain = 1L, eval_loglik = FALSE,
-  exact_loglik = FALSE, eval_freq = 10L, eval_size = 100L,
-  eval_nmc = 100L, eval_nstep = 10L, verbose = 0L)
+rbm_ucd(
+  m,
+  n,
+  dat,
+  b0 = NULL,
+  c0 = NULL,
+  w0 = NULL,
+  batch_size = 10L,
+  lr = 0.1,
+  momentum = 0,
+  niter = 100L,
+  min_mcmc = 1L,
+  max_mcmc = 100L,
+  nchain = 1L,
+  eval_loglik = FALSE,
+  exact_loglik = FALSE,
+  eval_freq = 10L,
+  eval_size = 100L,
+  eval_nmc = 100L,
+  eval_nstep = 10L,
+  verbose = 0L
+)
 }
 \arguments{
 \item{m}{Dimension of the visible units.}
@@ -33,6 +67,8 @@ rbm_ucd(m, n, dat, b0 = NULL, c0 = NULL, w0 = NULL,
 \item{batch_size}{Size of the mini-batch.}
 
 \item{lr}{Learning rate.}
+
+\item{momentum}{Momentum coefficient in SGD.}
 
 \item{niter}{Number of iterations.}
 
@@ -55,10 +91,45 @@ rbm_ucd(m, n, dat, b0 = NULL, c0 = NULL, w0 = NULL,
 \item{eval_nstep}{Number of steps in the Gibbs sampler for approximating the log-likelihood.}
 
 \item{verbose}{Level of verbosity.}
-
-\item{momentum}{Momentum coefficient in SGD.}
 }
 \description{
 \code{rbm_cdk()} uses the traditional CD-k algorithm to train RBM.
 \code{rbm_ucd()} uses the unbiased CD algorithm.
+}
+\examples{
+\dontrun{
+# Bars-and-stripes data, Schulz et al. (2010), Fischer and Igel (2010)
+d = 4
+n = m = d^2
+N = 2^d
+dat = matrix(0, 2 * N, m)
+
+for(i in 1:N)
+{
+    bits = as.integer(rev(intToBits(i - 1)[1:d]))
+    mat = tcrossprod(bits, rep(1, d))
+    dat[2 * i - 1, ] = as.numeric(mat)
+    dat[2 * i, ] = as.numeric(t(mat))
+}
+
+N = nrow(dat)
+
+# Persistent contrastive divergence
+set.seed(123)
+pcd = rbm_cdk(m, n, t(dat), batch_size = N, lr = 0.1, niter = 1000,
+              ngibbs = 1, nchain = 1000, persistent = TRUE,
+              eval_loglik = TRUE, exact_loglik = TRUE,
+              eval_freq = 1, eval_size = N, verbose = 1)
+
+# Unbiased contrastive divergence
+set.seed(123)
+ucd = rbm_ucd(m, n, t(dat), batch_size = N, lr = 0.1, niter = 1000,
+              min_mcmc = 1, max_mcmc = 100, nchain = 1000,
+              eval_loglik = TRUE, exact_loglik = TRUE,
+              eval_freq = 1, eval_size = N, verbose = 1)
+
+plot(pcd$loglik, type = "l")
+lines(ucd$loglik, col = "blue")
+}
+
 }

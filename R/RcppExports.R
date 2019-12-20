@@ -81,16 +81,16 @@ rbm_sample_tau <- function(w, b, c, v0, min_steps = 10L, max_steps = 100L, verbo
     .Call(`_cdtau_rbm_sample_tau`, w, b, c, v0, min_steps, max_steps, verbose)
 }
 
-rbm_cdk_warm_ <- function(vis_dim, hid_dim, dat, b0, c0, w0, batch_size = 10L, lr = 0.1, niter = 100L, ngibbs = 10L, nchain = 1L, persistent = FALSE, eval_loglik = FALSE, exact_loglik = FALSE, eval_freq = 10L, eval_size = 100L, eval_nmc = 100L, eval_nstep = 10L, verbose = 0L) {
-    .Call(`_cdtau_rbm_cdk_warm_`, vis_dim, hid_dim, dat, b0, c0, w0, batch_size, lr, niter, ngibbs, nchain, persistent, eval_loglik, exact_loglik, eval_freq, eval_size, eval_nmc, eval_nstep, verbose)
+rbm_cdk_warm_ <- function(vis_dim, hid_dim, dat, b0, c0, w0, batch_size = 10L, lr = 0.1, momentum = 0.0, niter = 100L, ngibbs = 10L, nchain = 1L, persistent = FALSE, eval_loglik = FALSE, exact_loglik = FALSE, eval_freq = 10L, eval_size = 100L, eval_nmc = 100L, eval_nstep = 10L, verbose = 0L) {
+    .Call(`_cdtau_rbm_cdk_warm_`, vis_dim, hid_dim, dat, b0, c0, w0, batch_size, lr, momentum, niter, ngibbs, nchain, persistent, eval_loglik, exact_loglik, eval_freq, eval_size, eval_nmc, eval_nstep, verbose)
 }
 
-rbm_cdk_ <- function(vis_dim, hid_dim, dat, batch_size = 10L, lr = 0.1, niter = 100L, ngibbs = 10L, nchain = 1L, persistent = FALSE, eval_loglik = FALSE, exact_loglik = FALSE, eval_freq = 10L, eval_size = 100L, eval_nmc = 100L, eval_nstep = 10L, verbose = 0L) {
-    .Call(`_cdtau_rbm_cdk_`, vis_dim, hid_dim, dat, batch_size, lr, niter, ngibbs, nchain, persistent, eval_loglik, exact_loglik, eval_freq, eval_size, eval_nmc, eval_nstep, verbose)
+rbm_cdk_ <- function(vis_dim, hid_dim, dat, batch_size = 10L, lr = 0.1, momentum = 0.0, niter = 100L, ngibbs = 10L, nchain = 1L, persistent = FALSE, eval_loglik = FALSE, exact_loglik = FALSE, eval_freq = 10L, eval_size = 100L, eval_nmc = 100L, eval_nstep = 10L, verbose = 0L) {
+    .Call(`_cdtau_rbm_cdk_`, vis_dim, hid_dim, dat, batch_size, lr, momentum, niter, ngibbs, nchain, persistent, eval_loglik, exact_loglik, eval_freq, eval_size, eval_nmc, eval_nstep, verbose)
 }
 
-rbm_ucd_warm_ <- function(vis_dim, hid_dim, dat, b0, c0, w0, batch_size = 10L, lr = 0.1, momemtum = 0.0, niter = 100L, min_mcmc = 1L, max_mcmc = 100L, nchain = 1L, eval_loglik = FALSE, exact_loglik = FALSE, eval_freq = 10L, eval_size = 100L, eval_nmc = 100L, eval_nstep = 10L, verbose = 0L) {
-    .Call(`_cdtau_rbm_ucd_warm_`, vis_dim, hid_dim, dat, b0, c0, w0, batch_size, lr, momemtum, niter, min_mcmc, max_mcmc, nchain, eval_loglik, exact_loglik, eval_freq, eval_size, eval_nmc, eval_nstep, verbose)
+rbm_ucd_warm_ <- function(vis_dim, hid_dim, dat, b0, c0, w0, batch_size = 10L, lr = 0.1, momentum = 0.0, niter = 100L, min_mcmc = 1L, max_mcmc = 100L, nchain = 1L, eval_loglik = FALSE, exact_loglik = FALSE, eval_freq = 10L, eval_size = 100L, eval_nmc = 100L, eval_nstep = 10L, verbose = 0L) {
+    .Call(`_cdtau_rbm_ucd_warm_`, vis_dim, hid_dim, dat, b0, c0, w0, batch_size, lr, momentum, niter, min_mcmc, max_mcmc, nchain, eval_loglik, exact_loglik, eval_freq, eval_size, eval_nmc, eval_nstep, verbose)
 }
 
 rbm_ucd_ <- function(vis_dim, hid_dim, dat, batch_size = 10L, lr = 0.1, momentum = 0.0, niter = 100L, min_mcmc = 1L, max_mcmc = 100L, nchain = 1L, eval_loglik = FALSE, exact_loglik = FALSE, eval_freq = 10L, eval_size = 100L, eval_nmc = 100L, eval_nstep = 10L, verbose = 0L) {

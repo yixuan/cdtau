@@ -7,8 +7,7 @@
 \usage{
 rbm_sample_k(w, b, c, v0, k = 10L)
 
-rbm_sample_tau(w, b, c, v0, min_steps = 10L, max_steps = 100L,
-  verbose = FALSE)
+rbm_sample_tau(w, b, c, v0, min_steps = 10L, max_steps = 100L, verbose = FALSE)
 }
 \arguments{
 \item{w}{Weight parameter of the RBM, of size \code{[m x n]}.}
