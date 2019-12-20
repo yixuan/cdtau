@@ -24,6 +24,41 @@
 #' @param eval_nstep    Number of steps in the Gibbs sampler for approximating the log-likelihood.
 #' @param verbose       Level of verbosity.
 #'
+#' @examples \dontrun{
+#' # Bars-and-stripes data, Schulz et al. (2010), Fischer and Igel (2010)
+#' d = 4
+#' n = m = d^2
+#' N = 2^d
+#' dat = matrix(0, 2 * N, m)
+#'
+#' for(i in 1:N)
+#' {
+#'     bits = as.integer(rev(intToBits(i - 1)[1:d]))
+#'     mat = tcrossprod(bits, rep(1, d))
+#'     dat[2 * i - 1, ] = as.numeric(mat)
+#'     dat[2 * i, ] = as.numeric(t(mat))
+#' }
+#'
+#' N = nrow(dat)
+#'
+#' # Persistent contrastive divergence
+#' set.seed(123)
+#' pcd = rbm_cdk(m, n, t(dat), batch_size = N, lr = 0.1, niter = 1000,
+#'               ngibbs = 1, nchain = 1000, persistent = TRUE,
+#'               eval_loglik = TRUE, exact_loglik = TRUE,
+#'               eval_freq = 1, eval_size = N, verbose = 1)
+#'
+#' # Unbiased contrastive divergence
+#' set.seed(123)
+#' ucd = rbm_ucd(m, n, t(dat), batch_size = N, lr = 0.1, niter = 1000,
+#'               min_mcmc = 1, max_mcmc = 100, nchain = 1000,
+#'               eval_loglik = TRUE, exact_loglik = TRUE,
+#'               eval_freq = 1, eval_size = N, verbose = 1)
+#'
+#' plot(pcd$loglik, type = "l")
+#' lines(ucd$loglik, col = "blue")
+#' }
+#'
 #' @rdname rbm_cd
 #'
 rbm_cdk = function(
