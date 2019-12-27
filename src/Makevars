@@ -1,3 +1,5 @@
+CXX_STD = CXX14
+
 BLAS_FLAGS =
 # Uncomment the following line if you have linked R to OpenBLAS
 # BLAS_FLAGS = -DUSE_OPENBLAS -DEIGEN_USE_BLAS
