@@ -17,6 +17,7 @@ typedef Eigen::Map<MatrixXd> MapMat;
 //' @param nsamp   Size of the Monte Carlo sample for approximation.
 //' @param nstep   Number of steps in the Gibbs sampler.
 //' @param vr      Whether to use variance reduction technique.
+//' @param nthread Number of threads for parallel computing, if OpenMP is supported.
 //'
 //' @examples
 //' set.seed(123)
@@ -57,7 +58,7 @@ double loglik_rbm(MapMat w, MapVec b, MapVec c, MapMat dat)
 //' @rdname loglik_rbm
 // [[Rcpp::export]]
 double loglik_rbm_approx(MapMat w, MapVec b, MapVec c, MapMat dat,
-                         int nsamp = 100, int nstep = 10, bool vr = true)
+                         int nsamp = 100, int nstep = 10, bool vr = true, int nthread = 8)
 {
     const int m = w.rows();
     const int n = w.cols();
@@ -67,7 +68,8 @@ double loglik_rbm_approx(MapMat w, MapVec b, MapVec c, MapMat dat,
     if(b.size() != m || c.size() != n || dat.rows() != m)
         Rcpp::stop("Dimensions do not match");
 
-    return loglik_rbm_approx(m, n, N, w.data(), b.data(), c.data(), dat.data(), nsamp, nstep, vr);
+    return loglik_rbm_approx(m, n, N, w.data(), b.data(), c.data(), dat.data(),
+                             nsamp, nstep, vr, nthread);
 }
 
 /*

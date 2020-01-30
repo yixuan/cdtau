@@ -17,6 +17,7 @@ extern "C" {
     int openblas_get_num_threads(void);
 }
 #endif
+// ============================= OpenBLAS specific functions =============================
 
 // res[n x 2^n]
 template <typename Scalar>
@@ -86,7 +87,7 @@ template <typename Scalar>
 Scalar loglik_rbm_approx(
     int m, int n, int N,
     const Scalar* wp, const Scalar* bp, const Scalar* cp, const Scalar* datp,
-    int nsamp = 100, int nstep = 10, bool vr = true
+    int nsamp = 100, int nstep = 10, bool vr = true, int nthread = 1
 )
 {
     typedef Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic> Matrix;
@@ -108,11 +109,11 @@ Scalar loglik_rbm_approx(
 
     // Inside OpenMP only use one thread for OpenBLAS
 #ifdef USE_OPENBLAS
-    const int nthread = openblas_get_num_threads();
+    const int nthread_openblas = openblas_get_num_threads();
     openblas_set_num_threads(1);
 #endif
 
-    #pragma omp parallel for shared(seeds, dat, w, b, c, m, n, N, nsamp, nstep) reduction(+:loglik) schedule(dynamic)
+    #pragma omp parallel for shared(seeds, dat, w, b, c, m, n, N, nsamp, nstep) reduction(+:loglik) schedule(dynamic) num_threads(nthread)
     for(int i = 0; i < N; i++)
     {
         RBMSampler<Scalar> sampler(w, b, c);
@@ -138,7 +139,7 @@ Scalar loglik_rbm_approx(
     }
 
 #ifdef USE_OPENBLAS
-    openblas_set_num_threads(nthread);
+    openblas_set_num_threads(nthread_openblas);
 #endif
 
     return loglik - N * std::log(Scalar(nsamp));

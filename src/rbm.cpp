@@ -22,7 +22,7 @@ List rbm_cdk_warm_(
     int ngibbs = 10, int nchain = 1, bool persistent = false,
     bool eval_loglik = false, bool exact_loglik = false,
     int eval_freq = 10, int eval_size = 100, int eval_nmc = 100, int eval_nstep = 10,
-    int verbose = 0
+    int nthread = 1, int verbose = 0
 )
 {
     typedef float Scalar;
@@ -94,7 +94,7 @@ List rbm_cdk_warm_(
             {
                 if(eval_loglik)
                 {
-                    const Scalar res = rbm.loglik(dat, exact_loglik, eval_size, eval_nmc, eval_nstep);
+                    const Scalar res = rbm.loglik(dat, exact_loglik, eval_size, eval_nmc, eval_nstep, nthread);
                     loglik.push_back(res);
                 } else {
                     loglik.push_back(NumericVector::get_na());
@@ -118,7 +118,7 @@ List rbm_cdk_(
     int ngibbs = 10, int nchain = 1, bool persistent = false,
     bool eval_loglik = false, bool exact_loglik = false,
     int eval_freq = 10, int eval_size = 100, int eval_nmc = 100, int eval_nstep = 10,
-    int verbose = 0
+    int nthread = 1, int verbose = 0
 )
 {
     const int m = vis_dim;
@@ -141,7 +141,7 @@ List rbm_cdk_(
                          ngibbs, nchain, persistent,
                          eval_loglik, exact_loglik,
                          eval_freq, eval_size, eval_nmc, eval_nstep,
-                         verbose);
+                         nthread, verbose);
 }
 
 // dat [m x N]
@@ -153,7 +153,7 @@ List rbm_ucd_warm_(
     int min_mcmc = 1, int max_mcmc = 100, int nchain = 1,
     bool eval_loglik = false, bool exact_loglik = false,
     int eval_freq = 10, int eval_size = 100, int eval_nmc = 100, int eval_nstep = 10,
-    int verbose = 0
+    int nthread = 1, int verbose = 0
 )
 {
     typedef float Scalar;
@@ -223,7 +223,7 @@ List rbm_ucd_warm_(
 
             // Second term
             rbm.zero_grad2();
-            #pragma omp parallel for shared(seeds, rbm) reduction(+:tau_sum, disc_sum) schedule(dynamic)
+            #pragma omp parallel for shared(seeds, rbm) reduction(+:tau_sum, disc_sum) schedule(dynamic) num_threads(nthread)
             for(int j = 0; j < nchain; j++)
             {
                 Scalar tau_t = 0.0, disc_t = 0.0;
@@ -246,7 +246,7 @@ List rbm_ucd_warm_(
             {
                 if(eval_loglik)
                 {
-                    const Scalar res = rbm.loglik(dat, exact_loglik, eval_size, eval_nmc, eval_nstep);
+                    const Scalar res = rbm.loglik(dat, exact_loglik, eval_size, eval_nmc, eval_nstep, nthread);
                     loglik.push_back(res);
                 } else {
                     loglik.push_back(NumericVector::get_na());
@@ -280,7 +280,7 @@ List rbm_ucd_(
     int min_mcmc = 1, int max_mcmc = 100, int nchain = 1,
     bool eval_loglik = false, bool exact_loglik = false,
     int eval_freq = 10, int eval_size = 100, int eval_nmc = 100, int eval_nstep = 10,
-    int verbose = 0
+    int nthread = 1, int verbose = 0
 )
 {
     const int m = vis_dim;
@@ -303,5 +303,5 @@ List rbm_ucd_(
                          min_mcmc, max_mcmc, nchain,
                          eval_loglik, exact_loglik,
                          eval_freq, eval_size, eval_nmc, eval_nstep,
-                         verbose);
+                         nthread, verbose);
 }

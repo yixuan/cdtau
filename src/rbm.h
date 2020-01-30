@@ -81,7 +81,10 @@ public:
 
     // Log-likelihood value
     template <typename Derived>
-    Scalar loglik(Eigen::MatrixBase<Derived>& dat, bool exact = false, int nobs = 100, int nmc = 30, int nstep = 10) const
+    Scalar loglik(
+        Eigen::MatrixBase<Derived>& dat, bool exact = false,
+        int nobs = 100, int nmc = 30, int nstep = 10, int nthread = 1
+    ) const
     {
         // Get a subset of data
         const int N = dat.cols();
@@ -99,7 +102,7 @@ public:
 
         const Scalar res = exact ?
             (loglik_rbm_exact(m_m, m_n, nobs, m_w.data(), m_b.data(), m_c.data(), subdat.data())) :
-            (loglik_rbm_approx(m_m, m_n, nobs, m_w.data(), m_b.data(), m_c.data(), subdat.data(), nmc, nstep));
+            (loglik_rbm_approx(m_m, m_n, nobs, m_w.data(), m_b.data(), m_c.data(), subdat.data(), nmc, nstep, true, nthread));
 
         return res;
     }

@@ -22,6 +22,7 @@
 #' @param eval_size     Size of sub-sampled data to evaluate log-likelihood.
 #' @param eval_nmc      Size of the Monte Carlo sample for approximating the log-likelihood.
 #' @param eval_nstep    Number of steps in the Gibbs sampler for approximating the log-likelihood.
+#' @param nthread       Number of threads for parallel computing, if OpenMP is supported.
 #' @param verbose       Level of verbosity.
 #'
 #' @examples \dontrun{
@@ -65,14 +66,15 @@ rbm_cdk = function(
     m, n, dat, b0 = NULL, c0 = NULL, w0 = NULL,
     batch_size = 10L, lr = 0.1, momentum = 0.0, niter = 100L, ngibbs = 10L, nchain = 1L, persistent = FALSE,
     eval_loglik = FALSE, exact_loglik = FALSE,
-    eval_freq = 10L, eval_size = 100L, eval_nmc = 100L, eval_nstep = 10L, verbose = 0L
+    eval_freq = 10L, eval_size = 100L, eval_nmc = 100L, eval_nstep = 10L,
+    nthread = 1L, verbose = 0L
 )
 {
     if(is.null(b0) || is.null(c0) || is.null(w0))
     {
-        .Call(`_cdtau_rbm_cdk_`, m, n, dat, batch_size, lr, momentum, niter, ngibbs, nchain, persistent, eval_loglik, exact_loglik, eval_freq, eval_size, eval_nmc, eval_nstep, verbose)
+        .Call(`_cdtau_rbm_cdk_`, m, n, dat, batch_size, lr, momentum, niter, ngibbs, nchain, persistent, eval_loglik, exact_loglik, eval_freq, eval_size, eval_nmc, eval_nstep, nthread, verbose)
     } else {
-        .Call(`_cdtau_rbm_cdk_warm_`, m, n, dat, b0, c0, w0, batch_size, lr, momentum, niter, ngibbs, nchain, persistent, eval_loglik, exact_loglik, eval_freq, eval_size, eval_nmc, eval_nstep, verbose)
+        .Call(`_cdtau_rbm_cdk_warm_`, m, n, dat, b0, c0, w0, batch_size, lr, momentum, niter, ngibbs, nchain, persistent, eval_loglik, exact_loglik, eval_freq, eval_size, eval_nmc, eval_nstep, nthread, verbose)
     }
 }
 
@@ -82,13 +84,14 @@ rbm_ucd = function(
     m, n, dat, b0 = NULL, c0 = NULL, w0 = NULL,
     batch_size = 10L, lr = 0.1, momentum = 0.0, niter = 100L, min_mcmc = 1L, max_mcmc = 100L, nchain = 1L,
     eval_loglik = FALSE, exact_loglik = FALSE,
-    eval_freq = 10L, eval_size = 100L, eval_nmc = 100L, eval_nstep = 10L, verbose = 0L
+    eval_freq = 10L, eval_size = 100L, eval_nmc = 100L, eval_nstep = 10L,
+    nthread = 1L, verbose = 0L
 )
 {
     if(is.null(b0) || is.null(c0) || is.null(w0))
     {
-        .Call(`_cdtau_rbm_ucd_`, m, n, dat, batch_size, lr, momentum, niter, min_mcmc, max_mcmc, nchain, eval_loglik, exact_loglik, eval_freq, eval_size, eval_nmc, eval_nstep, verbose)
+        .Call(`_cdtau_rbm_ucd_`, m, n, dat, batch_size, lr, momentum, niter, min_mcmc, max_mcmc, nchain, eval_loglik, exact_loglik, eval_freq, eval_size, eval_nmc, eval_nstep, nthread, verbose)
     } else {
-        .Call(`_cdtau_rbm_ucd_warm_`, m, n, dat, b0, c0, w0, batch_size, lr, momentum, niter, min_mcmc, max_mcmc, nchain, eval_loglik, exact_loglik, eval_freq, eval_size, eval_nmc, eval_nstep, verbose)
+        .Call(`_cdtau_rbm_ucd_warm_`, m, n, dat, b0, c0, w0, batch_size, lr, momentum, niter, min_mcmc, max_mcmc, nchain, eval_loglik, exact_loglik, eval_freq, eval_size, eval_nmc, eval_nstep, nthread, verbose)
     }
 }
