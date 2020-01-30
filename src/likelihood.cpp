@@ -58,7 +58,7 @@ double loglik_rbm(MapMat w, MapVec b, MapVec c, MapMat dat)
 //' @rdname loglik_rbm
 // [[Rcpp::export]]
 double loglik_rbm_approx(MapMat w, MapVec b, MapVec c, MapMat dat,
-                         int nsamp = 100, int nstep = 10, bool vr = true, int nthread = 8)
+                         int nsamp = 100, int nstep = 10, bool vr = true, int nthread = 1)
 {
     const int m = w.rows();
     const int n = w.cols();
