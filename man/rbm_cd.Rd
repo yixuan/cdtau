@@ -25,6 +25,7 @@ rbm_cdk(
   eval_size = 100L,
   eval_nmc = 100L,
   eval_nstep = 10L,
+  nthread = 1L,
   verbose = 0L
 )
 
@@ -48,6 +49,7 @@ rbm_ucd(
   eval_size = 100L,
   eval_nmc = 100L,
   eval_nstep = 10L,
+  nthread = 1L,
   verbose = 0L
 )
 }
@@ -89,6 +91,8 @@ rbm_ucd(
 \item{eval_nmc}{Size of the Monte Carlo sample for approximating the log-likelihood.}
 
 \item{eval_nstep}{Number of steps in the Gibbs sampler for approximating the log-likelihood.}
+
+\item{nthread}{Number of threads for parallel computing, if OpenMP is supported.}
 
 \item{verbose}{Level of verbosity.}
 }

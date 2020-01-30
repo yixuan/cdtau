@@ -22,8 +22,8 @@ BEGIN_RCPP
 END_RCPP
 }
 // loglik_rbm_approx
-double loglik_rbm_approx(MapMat w, MapVec b, MapVec c, MapMat dat, int nsamp, int nstep, bool vr);
-RcppExport SEXP _cdtau_loglik_rbm_approx(SEXP wSEXP, SEXP bSEXP, SEXP cSEXP, SEXP datSEXP, SEXP nsampSEXP, SEXP nstepSEXP, SEXP vrSEXP) {
+double loglik_rbm_approx(MapMat w, MapVec b, MapVec c, MapMat dat, int nsamp, int nstep, bool vr, int nthread);
+RcppExport SEXP _cdtau_loglik_rbm_approx(SEXP wSEXP, SEXP bSEXP, SEXP cSEXP, SEXP datSEXP, SEXP nsampSEXP, SEXP nstepSEXP, SEXP vrSEXP, SEXP nthreadSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -34,7 +34,8 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< int >::type nsamp(nsampSEXP);
     Rcpp::traits::input_parameter< int >::type nstep(nstepSEXP);
     Rcpp::traits::input_parameter< bool >::type vr(vrSEXP);
-    rcpp_result_gen = Rcpp::wrap(loglik_rbm_approx(w, b, c, dat, nsamp, nstep, vr));
+    Rcpp::traits::input_parameter< int >::type nthread(nthreadSEXP);
+    rcpp_result_gen = Rcpp::wrap(loglik_rbm_approx(w, b, c, dat, nsamp, nstep, vr, nthread));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -71,8 +72,8 @@ BEGIN_RCPP
 END_RCPP
 }
 // rbm_cdk_warm_
-List rbm_cdk_warm_(int vis_dim, int hid_dim, MapMat dat, MapVec b0, MapVec c0, MapMat w0, int batch_size, double lr, double momentum, int niter, int ngibbs, int nchain, bool persistent, bool eval_loglik, bool exact_loglik, int eval_freq, int eval_size, int eval_nmc, int eval_nstep, int verbose);
-RcppExport SEXP _cdtau_rbm_cdk_warm_(SEXP vis_dimSEXP, SEXP hid_dimSEXP, SEXP datSEXP, SEXP b0SEXP, SEXP c0SEXP, SEXP w0SEXP, SEXP batch_sizeSEXP, SEXP lrSEXP, SEXP momentumSEXP, SEXP niterSEXP, SEXP ngibbsSEXP, SEXP nchainSEXP, SEXP persistentSEXP, SEXP eval_loglikSEXP, SEXP exact_loglikSEXP, SEXP eval_freqSEXP, SEXP eval_sizeSEXP, SEXP eval_nmcSEXP, SEXP eval_nstepSEXP, SEXP verboseSEXP) {
+List rbm_cdk_warm_(int vis_dim, int hid_dim, MapMat dat, MapVec b0, MapVec c0, MapMat w0, int batch_size, double lr, double momentum, int niter, int ngibbs, int nchain, bool persistent, bool eval_loglik, bool exact_loglik, int eval_freq, int eval_size, int eval_nmc, int eval_nstep, int nthread, int verbose);
+RcppExport SEXP _cdtau_rbm_cdk_warm_(SEXP vis_dimSEXP, SEXP hid_dimSEXP, SEXP datSEXP, SEXP b0SEXP, SEXP c0SEXP, SEXP w0SEXP, SEXP batch_sizeSEXP, SEXP lrSEXP, SEXP momentumSEXP, SEXP niterSEXP, SEXP ngibbsSEXP, SEXP nchainSEXP, SEXP persistentSEXP, SEXP eval_loglikSEXP, SEXP exact_loglikSEXP, SEXP eval_freqSEXP, SEXP eval_sizeSEXP, SEXP eval_nmcSEXP, SEXP eval_nstepSEXP, SEXP nthreadSEXP, SEXP verboseSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -95,14 +96,15 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< int >::type eval_size(eval_sizeSEXP);
     Rcpp::traits::input_parameter< int >::type eval_nmc(eval_nmcSEXP);
     Rcpp::traits::input_parameter< int >::type eval_nstep(eval_nstepSEXP);
+    Rcpp::traits::input_parameter< int >::type nthread(nthreadSEXP);
     Rcpp::traits::input_parameter< int >::type verbose(verboseSEXP);
-    rcpp_result_gen = Rcpp::wrap(rbm_cdk_warm_(vis_dim, hid_dim, dat, b0, c0, w0, batch_size, lr, momentum, niter, ngibbs, nchain, persistent, eval_loglik, exact_loglik, eval_freq, eval_size, eval_nmc, eval_nstep, verbose));
+    rcpp_result_gen = Rcpp::wrap(rbm_cdk_warm_(vis_dim, hid_dim, dat, b0, c0, w0, batch_size, lr, momentum, niter, ngibbs, nchain, persistent, eval_loglik, exact_loglik, eval_freq, eval_size, eval_nmc, eval_nstep, nthread, verbose));
     return rcpp_result_gen;
 END_RCPP
 }
 // rbm_cdk_
-List rbm_cdk_(int vis_dim, int hid_dim, MapMat dat, int batch_size, double lr, double momentum, int niter, int ngibbs, int nchain, bool persistent, bool eval_loglik, bool exact_loglik, int eval_freq, int eval_size, int eval_nmc, int eval_nstep, int verbose);
-RcppExport SEXP _cdtau_rbm_cdk_(SEXP vis_dimSEXP, SEXP hid_dimSEXP, SEXP datSEXP, SEXP batch_sizeSEXP, SEXP lrSEXP, SEXP momentumSEXP, SEXP niterSEXP, SEXP ngibbsSEXP, SEXP nchainSEXP, SEXP persistentSEXP, SEXP eval_loglikSEXP, SEXP exact_loglikSEXP, SEXP eval_freqSEXP, SEXP eval_sizeSEXP, SEXP eval_nmcSEXP, SEXP eval_nstepSEXP, SEXP verboseSEXP) {
+List rbm_cdk_(int vis_dim, int hid_dim, MapMat dat, int batch_size, double lr, double momentum, int niter, int ngibbs, int nchain, bool persistent, bool eval_loglik, bool exact_loglik, int eval_freq, int eval_size, int eval_nmc, int eval_nstep, int nthread, int verbose);
+RcppExport SEXP _cdtau_rbm_cdk_(SEXP vis_dimSEXP, SEXP hid_dimSEXP, SEXP datSEXP, SEXP batch_sizeSEXP, SEXP lrSEXP, SEXP momentumSEXP, SEXP niterSEXP, SEXP ngibbsSEXP, SEXP nchainSEXP, SEXP persistentSEXP, SEXP eval_loglikSEXP, SEXP exact_loglikSEXP, SEXP eval_freqSEXP, SEXP eval_sizeSEXP, SEXP eval_nmcSEXP, SEXP eval_nstepSEXP, SEXP nthreadSEXP, SEXP verboseSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -122,14 +124,15 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< int >::type eval_size(eval_sizeSEXP);
     Rcpp::traits::input_parameter< int >::type eval_nmc(eval_nmcSEXP);
     Rcpp::traits::input_parameter< int >::type eval_nstep(eval_nstepSEXP);
+    Rcpp::traits::input_parameter< int >::type nthread(nthreadSEXP);
     Rcpp::traits::input_parameter< int >::type verbose(verboseSEXP);
-    rcpp_result_gen = Rcpp::wrap(rbm_cdk_(vis_dim, hid_dim, dat, batch_size, lr, momentum, niter, ngibbs, nchain, persistent, eval_loglik, exact_loglik, eval_freq, eval_size, eval_nmc, eval_nstep, verbose));
+    rcpp_result_gen = Rcpp::wrap(rbm_cdk_(vis_dim, hid_dim, dat, batch_size, lr, momentum, niter, ngibbs, nchain, persistent, eval_loglik, exact_loglik, eval_freq, eval_size, eval_nmc, eval_nstep, nthread, verbose));
     return rcpp_result_gen;
 END_RCPP
 }
 // rbm_ucd_warm_
-List rbm_ucd_warm_(int vis_dim, int hid_dim, MapMat dat, MapVec b0, MapVec c0, MapMat w0, int batch_size, double lr, double momentum, int niter, int min_mcmc, int max_mcmc, int nchain, bool eval_loglik, bool exact_loglik, int eval_freq, int eval_size, int eval_nmc, int eval_nstep, int verbose);
-RcppExport SEXP _cdtau_rbm_ucd_warm_(SEXP vis_dimSEXP, SEXP hid_dimSEXP, SEXP datSEXP, SEXP b0SEXP, SEXP c0SEXP, SEXP w0SEXP, SEXP batch_sizeSEXP, SEXP lrSEXP, SEXP momentumSEXP, SEXP niterSEXP, SEXP min_mcmcSEXP, SEXP max_mcmcSEXP, SEXP nchainSEXP, SEXP eval_loglikSEXP, SEXP exact_loglikSEXP, SEXP eval_freqSEXP, SEXP eval_sizeSEXP, SEXP eval_nmcSEXP, SEXP eval_nstepSEXP, SEXP verboseSEXP) {
+List rbm_ucd_warm_(int vis_dim, int hid_dim, MapMat dat, MapVec b0, MapVec c0, MapMat w0, int batch_size, double lr, double momentum, int niter, int min_mcmc, int max_mcmc, int nchain, bool eval_loglik, bool exact_loglik, int eval_freq, int eval_size, int eval_nmc, int eval_nstep, int nthread, int verbose);
+RcppExport SEXP _cdtau_rbm_ucd_warm_(SEXP vis_dimSEXP, SEXP hid_dimSEXP, SEXP datSEXP, SEXP b0SEXP, SEXP c0SEXP, SEXP w0SEXP, SEXP batch_sizeSEXP, SEXP lrSEXP, SEXP momentumSEXP, SEXP niterSEXP, SEXP min_mcmcSEXP, SEXP max_mcmcSEXP, SEXP nchainSEXP, SEXP eval_loglikSEXP, SEXP exact_loglikSEXP, SEXP eval_freqSEXP, SEXP eval_sizeSEXP, SEXP eval_nmcSEXP, SEXP eval_nstepSEXP, SEXP nthreadSEXP, SEXP verboseSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -152,14 +155,15 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< int >::type eval_size(eval_sizeSEXP);
     Rcpp::traits::input_parameter< int >::type eval_nmc(eval_nmcSEXP);
     Rcpp::traits::input_parameter< int >::type eval_nstep(eval_nstepSEXP);
+    Rcpp::traits::input_parameter< int >::type nthread(nthreadSEXP);
     Rcpp::traits::input_parameter< int >::type verbose(verboseSEXP);
-    rcpp_result_gen = Rcpp::wrap(rbm_ucd_warm_(vis_dim, hid_dim, dat, b0, c0, w0, batch_size, lr, momentum, niter, min_mcmc, max_mcmc, nchain, eval_loglik, exact_loglik, eval_freq, eval_size, eval_nmc, eval_nstep, verbose));
+    rcpp_result_gen = Rcpp::wrap(rbm_ucd_warm_(vis_dim, hid_dim, dat, b0, c0, w0, batch_size, lr, momentum, niter, min_mcmc, max_mcmc, nchain, eval_loglik, exact_loglik, eval_freq, eval_size, eval_nmc, eval_nstep, nthread, verbose));
     return rcpp_result_gen;
 END_RCPP
 }
 // rbm_ucd_
-List rbm_ucd_(int vis_dim, int hid_dim, MapMat dat, int batch_size, double lr, double momentum, int niter, int min_mcmc, int max_mcmc, int nchain, bool eval_loglik, bool exact_loglik, int eval_freq, int eval_size, int eval_nmc, int eval_nstep, int verbose);
-RcppExport SEXP _cdtau_rbm_ucd_(SEXP vis_dimSEXP, SEXP hid_dimSEXP, SEXP datSEXP, SEXP batch_sizeSEXP, SEXP lrSEXP, SEXP momentumSEXP, SEXP niterSEXP, SEXP min_mcmcSEXP, SEXP max_mcmcSEXP, SEXP nchainSEXP, SEXP eval_loglikSEXP, SEXP exact_loglikSEXP, SEXP eval_freqSEXP, SEXP eval_sizeSEXP, SEXP eval_nmcSEXP, SEXP eval_nstepSEXP, SEXP verboseSEXP) {
+List rbm_ucd_(int vis_dim, int hid_dim, MapMat dat, int batch_size, double lr, double momentum, int niter, int min_mcmc, int max_mcmc, int nchain, bool eval_loglik, bool exact_loglik, int eval_freq, int eval_size, int eval_nmc, int eval_nstep, int nthread, int verbose);
+RcppExport SEXP _cdtau_rbm_ucd_(SEXP vis_dimSEXP, SEXP hid_dimSEXP, SEXP datSEXP, SEXP batch_sizeSEXP, SEXP lrSEXP, SEXP momentumSEXP, SEXP niterSEXP, SEXP min_mcmcSEXP, SEXP max_mcmcSEXP, SEXP nchainSEXP, SEXP eval_loglikSEXP, SEXP exact_loglikSEXP, SEXP eval_freqSEXP, SEXP eval_sizeSEXP, SEXP eval_nmcSEXP, SEXP eval_nstepSEXP, SEXP nthreadSEXP, SEXP verboseSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -179,21 +183,22 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< int >::type eval_size(eval_sizeSEXP);
     Rcpp::traits::input_parameter< int >::type eval_nmc(eval_nmcSEXP);
     Rcpp::traits::input_parameter< int >::type eval_nstep(eval_nstepSEXP);
+    Rcpp::traits::input_parameter< int >::type nthread(nthreadSEXP);
     Rcpp::traits::input_parameter< int >::type verbose(verboseSEXP);
-    rcpp_result_gen = Rcpp::wrap(rbm_ucd_(vis_dim, hid_dim, dat, batch_size, lr, momentum, niter, min_mcmc, max_mcmc, nchain, eval_loglik, exact_loglik, eval_freq, eval_size, eval_nmc, eval_nstep, verbose));
+    rcpp_result_gen = Rcpp::wrap(rbm_ucd_(vis_dim, hid_dim, dat, batch_size, lr, momentum, niter, min_mcmc, max_mcmc, nchain, eval_loglik, exact_loglik, eval_freq, eval_size, eval_nmc, eval_nstep, nthread, verbose));
     return rcpp_result_gen;
 END_RCPP
 }
 
 static const R_CallMethodDef CallEntries[] = {
     {"_cdtau_loglik_rbm", (DL_FUNC) &_cdtau_loglik_rbm, 4},
-    {"_cdtau_loglik_rbm_approx", (DL_FUNC) &_cdtau_loglik_rbm_approx, 7},
+    {"_cdtau_loglik_rbm_approx", (DL_FUNC) &_cdtau_loglik_rbm_approx, 8},
     {"_cdtau_rbm_sample_k", (DL_FUNC) &_cdtau_rbm_sample_k, 5},
     {"_cdtau_rbm_sample_tau", (DL_FUNC) &_cdtau_rbm_sample_tau, 7},
-    {"_cdtau_rbm_cdk_warm_", (DL_FUNC) &_cdtau_rbm_cdk_warm_, 20},
-    {"_cdtau_rbm_cdk_", (DL_FUNC) &_cdtau_rbm_cdk_, 17},
-    {"_cdtau_rbm_ucd_warm_", (DL_FUNC) &_cdtau_rbm_ucd_warm_, 20},
-    {"_cdtau_rbm_ucd_", (DL_FUNC) &_cdtau_rbm_ucd_, 17},
+    {"_cdtau_rbm_cdk_warm_", (DL_FUNC) &_cdtau_rbm_cdk_warm_, 21},
+    {"_cdtau_rbm_cdk_", (DL_FUNC) &_cdtau_rbm_cdk_, 18},
+    {"_cdtau_rbm_ucd_warm_", (DL_FUNC) &_cdtau_rbm_ucd_warm_, 21},
+    {"_cdtau_rbm_ucd_", (DL_FUNC) &_cdtau_rbm_ucd_, 18},
     {NULL, NULL, 0}
 };
 

@@ -7,7 +7,16 @@
 \usage{
 loglik_rbm(w, b, c, dat)
 
-loglik_rbm_approx(w, b, c, dat, nsamp = 100L, nstep = 10L, vr = TRUE)
+loglik_rbm_approx(
+  w,
+  b,
+  c,
+  dat,
+  nsamp = 100L,
+  nstep = 10L,
+  vr = TRUE,
+  nthread = 1L
+)
 }
 \arguments{
 \item{w}{Weight parameter of the RBM, of size \code{[m x n]}.}
@@ -23,6 +32,8 @@ loglik_rbm_approx(w, b, c, dat, nsamp = 100L, nstep = 10L, vr = TRUE)
 \item{nstep}{Number of steps in the Gibbs sampler.}
 
 \item{vr}{Whether to use variance reduction technique.}
+
+\item{nthread}{Number of threads for parallel computing, if OpenMP is supported.}
 }
 \description{
 The two functions compute the exact and approximate log-likelihood values for RBM, respectively.
