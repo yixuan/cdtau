@@ -87,9 +87,14 @@ ucd = rbm_ucd(m, n, t(dat), batch_size = N, lr = 0.1, niter = 10000,
               eval_loglik = TRUE, exact_loglik = TRUE,
               eval_freq = 1, eval_size = N, verbose = 1)
 
-plot(pcd$loglik, type = "l", xlab = "Iterations", ylab = "Log-likelihood Value")
-lines(ucd$loglik, col = "blue")
+plot(pcd$loglik, type = "l", col = "red",
+     xlab = "Iterations", ylab = "Log-likelihood Value")
+lines(ucd$loglik, col = rgb(0, 0, 1, 0.3))
+legend("bottomright", legend = c("PCD", "UCD"), col = c("red", "blue"), lwd = 2)
+
 ```
+
+<img src="https://i.imgur.com/wTdhuC4.png" alt="PCD vs UCD" width="659px" />
 
 ### Citation
 
