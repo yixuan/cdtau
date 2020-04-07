@@ -1,6 +1,10 @@
 #ifndef CDTAU_LIKELIHOOD_H
 #define CDTAU_LIKELIHOOD_H
 
+#ifdef USE_OPENBLAS
+#define EIGEN_USE_BLAS
+#endif
+
 #include <RcppEigen.h>
 #include "mcmc.h"
 #include "utils.h"

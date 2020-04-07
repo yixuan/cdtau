@@ -1,8 +1,13 @@
 #ifndef CDTAU_UTILS_SIMD_H
 #define CDTAU_UTILS_SIMD_H
 
+#ifdef USE_OPENBLAS
+#define EIGEN_USE_BLAS
+#endif
+
 #include <RcppEigen.h>
 #include <xsimd/xsimd.hpp>
+#include "utils.h"
 
 // The common operation W * h + b in RBM
 // h is a binary vector
@@ -22,10 +27,10 @@ void rbm_op_v_simd(
     const int simd_size = xsimd::simd_type<Scalar>::size;
     const int vec_size = m - m % simd_size;
 
-    // Fall back to default implementation
+    // Fall back to default implementation if m is not a multiple of the SIMD size
     if(vec_size != m)
     {
-        v.noalias() = w * h + b;
+        rbm_op_v<Scalar>(w, h, b, v);
         return;
     }
 
@@ -83,7 +88,7 @@ void rbm_op_rank4_simd(
     // Fall back to default implementation
     if(vec_size != m)
     {
-        w.noalias() += v1 * h1.transpose() + v2 * h2.transpose() - v3 * h3.transpose() - v4 * h4.transpose();
+        rbm_op_rank4<Scalar>(v1, h1, v2, h2, v3, h3, v4, h4, w);
         return;
     }
 

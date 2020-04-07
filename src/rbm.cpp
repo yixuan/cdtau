@@ -1,4 +1,3 @@
-#include <RcppEigen.h>
 #include "rbm.h"
 
 using Rcpp::NumericMatrix;

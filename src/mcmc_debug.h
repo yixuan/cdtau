@@ -1,6 +1,10 @@
 #ifndef CDTAU_MCMC_H
 #define CDTAU_MCMC_H
 
+#ifdef USE_OPENBLAS
+#define EIGEN_USE_BLAS
+#endif
+
 #include <RcppEigen.h>
 #include "utils.h"
 #include "utils_simd.h"

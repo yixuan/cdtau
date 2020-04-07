@@ -1,6 +1,10 @@
 #ifndef CDTAU_UTILS_H
 #define CDTAU_UTILS_H
 
+#ifdef USE_OPENBLAS
+#define EIGEN_USE_BLAS
+#endif
+
 #include <RcppEigen.h>
 #include <random>
 #include "blas.h"
@@ -16,7 +20,7 @@ void rbm_op_v(
     Eigen::Matrix<Scalar, Eigen::Dynamic, 1>& v
 )
 {
-#ifdef EIGEN_USE_BLAS
+#ifdef USE_OPENBLAS
 
     const int m = w.rows();
     const int n = w.cols();
@@ -50,7 +54,7 @@ void rbm_op_h(
     Eigen::Matrix<Scalar, Eigen::Dynamic, 1>& h
 )
 {
-#ifdef EIGEN_USE_BLAS
+#ifdef USE_OPENBLAS
 
     const int m = w.rows();
     const int n = w.cols();
@@ -98,7 +102,7 @@ void rbm_op_rank2(
     Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic>& w
 )
 {
-#ifdef EIGEN_USE_BLAS
+#ifdef USE_OPENBLAS
 
     const int m = w.rows();
     const int n = w.cols();
@@ -127,7 +131,7 @@ void rbm_op_rank4(
     Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic>& w
 )
 {
-#ifdef EIGEN_USE_BLAS
+#ifdef USE_OPENBLAS
 
     const int m = w.rows();
     const int n = w.cols();

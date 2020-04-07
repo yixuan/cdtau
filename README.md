@@ -25,7 +25,7 @@ First download this repository to a folder called `cdtau`, and then uncomment th
 
 ```
 # Uncomment the following line if you have linked R to OpenBLAS
-# BLAS_FLAGS = -DUSE_OPENBLAS -DEIGEN_USE_BLAS
+# BLAS_FLAGS = -DUSE_OPENBLAS
 ```
 
 Now `cdtau/src/Makevars` should look like
@@ -34,7 +34,7 @@ Now `cdtau/src/Makevars` should look like
 CXX_STD = CXX14
 
 # Uncomment the following line if you have linked R to OpenBLAS
-BLAS_FLAGS = -DUSE_OPENBLAS -DEIGEN_USE_BLAS
+BLAS_FLAGS = -DUSE_OPENBLAS
 
 PKG_CPPFLAGS = -march=native -I. -DEIGEN_MAX_ALIGN_BYTES=64 $(BLAS_FLAGS)
 PKG_CXXFLAGS = $(SHLIB_OPENMP_CXXFLAGS)

@@ -1,4 +1,3 @@
-#include <RcppEigen.h>
 #include "likelihood.h"
 
 using Eigen::VectorXd;

@@ -1,8 +1,8 @@
 #ifndef CDTAU_BLAS_H
 #define CDTAU_BLAS_H
 
-#ifdef EIGEN_USE_BLAS
-#include <RcppEigen.h>
+#ifdef USE_OPENBLAS
+
 #include <stdexcept>
 
 // ============================= ?copy =============================
@@ -89,6 +89,6 @@ inline void blas_ger<double>(int m, int n, double alpha,
 
 
 
-#endif  // EIGEN_USE_BLAS
+#endif  // USE_OPENBLAS
 
 #endif  // CDTAU_BLAS_H
