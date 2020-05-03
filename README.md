@@ -1,5 +1,9 @@
 ## CD-τ <img src="https://statr.me/images/sticker-cdtau.png" alt="cdtau" height="150px" align="right" />
 
+> There is a Python implementation under the `python` folder, which is mainly
+> used to demonstrate the algorithm and is not optimized for speed. The R
+> pacakge is written in efficient C++ with parallel computing support.
+
 The `cdtau` R package implements the unbiased contrastive divergence (UCD) algorithm based on the paper
 [Unbiased Contrastive Divergence Algorithm for Training Energy-Based Latent Variable Models](https://openreview.net/forum?id=r1eyceSYPr) (ICLR 2020) by Yixuan Qiu, Lingsong Zhang, and Xiao Wang.
 
